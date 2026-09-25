@@ -15,7 +15,7 @@ from . import __version__, export, store
 from .config import detect_blender, detect_gpu, get_settings
 from .jobs import get_job_manager
 from .pipeline import registry, runner
-from .pipeline.base import GenOptions
+from .pipeline.base import GenOptions, runtime_vram_policy
 
 router = APIRouter(prefix="/api")
 
@@ -64,6 +64,7 @@ def system_info() -> dict:
     return {
         "version": __version__,
         "gpu": detect_gpu(),
+        "memory_policy": runtime_vram_policy(),
         "blender": detect_blender() is not None,
         "adapters": {stage: registry.describe(stage) for stage in
                      ("image_to_3d", "text_to_image", "texturing")},
