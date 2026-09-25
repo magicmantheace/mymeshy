@@ -9,6 +9,7 @@ import importlib.util
 
 from PIL import Image
 
+from ...hardware import should_unload_between_stages
 from ..base import (
     GenOptions,
     ProgressFn,
@@ -80,6 +81,11 @@ class SdxlTurboTextToImage(TextToImageAdapter):
             generator=generator,
         ).images[0]
         progress(1.0, "Reference image ready")
+
+        # On the RTX 3060 profile the next heavy stage gets the whole GPU.
+        # The returned PIL image is CPU-owned, so it is safe to release SDXL now.
+        if should_unload_between_stages():
+            self.unload()
         return image
 
     def unload(self) -> None:
