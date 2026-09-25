@@ -29,11 +29,17 @@ class Settings(BaseSettings):
 
     data_dir: Path = REPO_ROOT / "data"
 
+    # Hardware-aware scheduling. "auto" detects known GPUs and applies a
+    # profile without hard-capping torch allocations. AssetForge's first
+    # reference profile is the RTX 3060 12GB.
+    hardware_profile: str = "auto"
+
+    # None = let the hardware profile decide. Explicit true/false overrides it.
+    force_stage_unload: Optional[bool] = None
+
     # GPU memory budget in GB. 0 = unlimited. When set, torch allocations are
-    # hard-capped to this amount and the pipeline switches to low-VRAM mode:
-    # sequential CPU offloading, smaller inference chunks, and models are
-    # loaded one stage at a time and unloaded between stages (slower, but the
-    # GPU stays usable for everything else).
+    # hard-capped to this amount and the existing <=8GB low-VRAM paths are used.
+    # Hardware profiles are intentionally separate from this hard cap.
     vram_budget_gb: float = 0
 
     # Adapter selection. "auto" picks the best available, preferring real
