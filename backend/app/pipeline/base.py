@@ -112,9 +112,14 @@ def vram_budget_gb() -> float:
 
 
 def low_vram() -> bool:
-    """True when a budget of 8GB or less is configured — adapters switch to
-    offloading/chunking and the runner unloads models between stages."""
-    b = vram_budget_gb()
+    """True for an effective VRAM budget/card size of 8GB or less.
+
+    An explicit hard cap wins. When no cap is configured, use detected physical
+    VRAM so small cards still enter the conservative adapter paths.
+    """
+    from ..hardware import effective_vram_gb
+
+    b = effective_vram_gb()
     return 0 < b <= 8
 
 
