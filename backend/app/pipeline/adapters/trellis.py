@@ -1,9 +1,8 @@
 """Microsoft TRELLIS image-to-3D adapter.
 
-Highest-quality open-source image-to-3D as of early 2026. Officially wants
-16GB VRAM but runs on 12GB cards with fp16 + the smaller sampler settings used
-here. Install from the TRELLIS repo (see README "Installing real models") —
-it is not a plain pip package.
+Legacy TRELLIS adapter kept for compatibility. AssetForge does not select it
+first on the RTX 3060 12GB profile; TRELLIS.2 will replace this as the quality
+backend in a later phase.
 """
 from __future__ import annotations
 
@@ -13,6 +12,7 @@ from typing import Sequence
 import trimesh
 from PIL import Image
 
+from ...hardware import should_unload_between_stages
 from ..base import GenOptions, ImageTo3DAdapter, MeshResult, ProgressFn, _torch_cuda_probe
 
 MODEL_ID = "microsoft/TRELLIS-image-large"
@@ -20,7 +20,7 @@ MODEL_ID = "microsoft/TRELLIS-image-large"
 
 class TrellisImageTo3D(ImageTo3DAdapter):
     name = "trellis"
-    description = "Microsoft TRELLIS image-large (best quality, 12-16GB VRAM)"
+    description = "Microsoft TRELLIS image-large (legacy quality backend, 12-16GB VRAM)"
 
     def __init__(self) -> None:
         self._pipe = None
@@ -72,7 +72,6 @@ class TrellisImageTo3D(ImageTo3DAdapter):
             simplify=0.0,  # our own pipeline handles decimation
             texture_size=opts.texture_size,
         )
-        # to_glb returns a trimesh.Trimesh with TextureVisuals
         mesh = glb if isinstance(glb, trimesh.Trimesh) else glb.dump(concatenate=True)
         albedo = None
         visual = getattr(mesh, "visual", None)
@@ -80,7 +79,10 @@ class TrellisImageTo3D(ImageTo3DAdapter):
         if material is not None:
             albedo = getattr(material, "baseColorTexture", None) or getattr(material, "image", None)
         progress(1.0, "TRELLIS mesh ready")
-        return MeshResult(mesh=mesh, albedo=albedo, textured=albedo is not None)
+        result = MeshResult(mesh=mesh, albedo=albedo, textured=albedo is not None)
+        if should_unload_between_stages():
+            self.unload()
+        return result
 
     def unload(self) -> None:
         if self._pipe is not None:
