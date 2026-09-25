@@ -15,6 +15,7 @@ from typing import Optional, Sequence
 import trimesh
 from PIL import Image
 
+from ...hardware import should_unload_between_stages
 from ..base import (
     GenOptions,
     ImageTo3DAdapter,
@@ -138,10 +139,14 @@ class Hunyuan3DImageTo3D(ImageTo3DAdapter):
             # Geometry-only result: the runner projects the reference image
             # onto the mesh as fallback albedo.
             progress(1.0, f"Shape ready (paint skipped: {paint_reason})")
-            return MeshResult(mesh=mesh, textured=False)
+            result = MeshResult(mesh=mesh, textured=False)
+            if should_unload_between_stages():
+                self.unload()
+            return result
 
-        if low_vram():
-            # Shape and paint models never share the GPU within the budget.
+        # The RTX 3060 12GB profile must not keep shape + paint resident at the
+        # same time. This is intentionally independent of the <=8GB low mode.
+        if should_unload_between_stages():
             self._unload_shape()
 
         paint = self._load_paint(progress)
@@ -153,7 +158,10 @@ class Hunyuan3DImageTo3D(ImageTo3DAdapter):
         if material is not None:
             albedo = getattr(material, "baseColorTexture", None) or getattr(material, "image", None)
         progress(1.0, "Hunyuan3D mesh ready")
-        return MeshResult(mesh=mesh, albedo=albedo, textured=albedo is not None)
+        result = MeshResult(mesh=mesh, albedo=albedo, textured=albedo is not None)
+        if should_unload_between_stages():
+            self.unload()
+        return result
 
     def unload(self) -> None:
         self._shape = None
@@ -212,7 +220,10 @@ class HunyuanPaintTexturing(TexturingAdapter):
         if material is not None:
             albedo = getattr(material, "baseColorTexture", None) or getattr(material, "image", None)
         progress(1.0, "Texture ready")
-        return MeshResult(mesh=painted, albedo=albedo, textured=albedo is not None)
+        result = MeshResult(mesh=painted, albedo=albedo, textured=albedo is not None)
+        if should_unload_between_stages():
+            self.unload()
+        return result
 
     def unload(self) -> None:
         self._paint = None
