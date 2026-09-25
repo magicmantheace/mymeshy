@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import __version__
 from .api import router
 from .config import detect_blender, detect_gpu, get_settings
+from .hardware import runtime_policy
 from .jobs import get_job_manager
 from .pipeline import registry
 
@@ -31,6 +32,12 @@ app.add_middleware(
 app.include_router(router)
 
 
+@app.get("/api/hardware")
+def hardware_status() -> dict:
+    """Resolved hardware profile and memory scheduling policy."""
+    return runtime_policy()
+
+
 @app.on_event("startup")
 def startup() -> None:
     settings = get_settings()
@@ -40,8 +47,10 @@ def startup() -> None:
     gpu = detect_gpu()
     blender = detect_blender()
     active = registry.active_names()
+    policy = runtime_policy()
     log.info("MyMeshy %s", __version__)
     log.info("GPU: %s", f"{gpu['name']} ({gpu['vram_mb']} MB)" if gpu else "none detected")
+    log.info("Hardware policy: %s", policy)
     log.info("Blender: %s", blender or "not found (FBX export disabled)")
     log.info("Active adapters: %s", active)
     if active["image_to_3d"] == "mock":
