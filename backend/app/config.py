@@ -27,17 +27,23 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8420
 
+    # Runtime hardware policy. "auto" detects known profiles from nvidia-smi.
+    # AssetForge v1 treats the RTX 3060 12GB as a reference configuration.
+    hardware_profile: str = "auto"
+
+    # None = hardware profile decides. True/False explicitly overrides the
+    # profile's stage-isolation policy.
+    force_stage_unload: Optional[bool] = None
+
     data_dir: Path = REPO_ROOT / "data"
 
     # GPU memory budget in GB. 0 = unlimited. When set, torch allocations are
-    # hard-capped to this amount and the pipeline switches to low-VRAM mode:
-    # sequential CPU offloading, smaller inference chunks, and models are
-    # loaded one stage at a time and unloaded between stages (slower, but the
-    # GPU stays usable for everything else).
+    # hard-capped to this amount. Scheduling/offload policy is separate so a
+    # 12GB GPU can use most of its VRAM while still unloading between stages.
     vram_budget_gb: float = 0
 
-    # Adapter selection. "auto" picks the best available, preferring real
-    # models over the mock pipeline.
+    # Adapter selection. "auto" picks a hardware-aware preference order and
+    # falls back to the mock pipeline.
     i23d_adapter: str = "auto"      # trellis | hunyuan3d | triposr | mock | auto
     t2i_adapter: str = "auto"       # sdxl_turbo | mock | auto
     texture_adapter: str = "auto"   # hunyuan_paint | mock | auto
