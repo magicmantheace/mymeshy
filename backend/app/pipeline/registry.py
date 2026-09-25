@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 from ..config import REPO_ROOT, get_settings
+from ..hardware import auto_image_to_3d_order
 
 
 def _add_external_repos() -> None:
@@ -29,7 +30,8 @@ from .adapters.trellis import TrellisImageTo3D
 from .adapters.triposr import TripoSRImageTo3D
 from .base import Adapter, ImageTo3DAdapter, TextToImageAdapter, TexturingAdapter
 
-# Order expresses "auto" preference (best first, mock always last).
+# Base order is still useful for generic hardware. Hardware profiles may reorder
+# this list for "auto" without changing explicit adapter selection.
 _I23D: list[ImageTo3DAdapter] = [
     TrellisImageTo3D(),
     Hunyuan3DImageTo3D(),
@@ -69,9 +71,17 @@ def describe(stage: str) -> list[dict]:
     return out
 
 
+def _auto_pool(stage: str, pool: list[Adapter]) -> list[Adapter]:
+    if stage != "image_to_3d":
+        return pool
+    order = auto_image_to_3d_order()
+    rank = {name: i for i, name in enumerate(order)}
+    return sorted(pool, key=lambda a: rank.get(a.name, len(rank) + 1))
+
+
 def resolve(stage: str, requested: Optional[str] = None) -> Adapter:
     """Pick an adapter for a stage. ``requested`` (job option) wins over the
-    configured default; "auto" walks the preference order."""
+    configured default; "auto" walks the hardware-aware preference order."""
     settings = get_settings()
     configured = {
         "image_to_3d": settings.i23d_adapter,
@@ -90,7 +100,7 @@ def resolve(stage: str, requested: Optional[str] = None) -> Adapter:
                 return a
         raise RuntimeError(f"Unknown {stage} adapter '{want}'")
 
-    for a in pool:
+    for a in _auto_pool(stage, pool):
         ok, _ = _probe((stage, a.name))
         if ok:
             return a
