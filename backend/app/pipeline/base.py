@@ -101,21 +101,89 @@ def _torch_cuda_probe() -> tuple[bool, str]:
 
 
 # --------------------------------------------------------------------------
-# VRAM budget
+# VRAM and hardware policy
 # --------------------------------------------------------------------------
 
 def vram_budget_gb() -> float:
-    """Configured GPU memory budget (0 = unlimited)."""
+    """Configured hard allocator budget (0 = no explicit hard cap)."""
     from ..config import get_settings
 
     return float(get_settings().vram_budget_gb or 0)
 
 
+def runtime_vram_gb() -> float:
+    """Effective VRAM for scheduling decisions.
+
+    An explicit allocator budget wins. Otherwise this uses physical VRAM from
+    nvidia-smi. This intentionally does not hard-cap torch on detected cards.
+    """
+    configured = vram_budget_gb()
+    if configured > 0:
+        return configured
+
+    from ..config import detect_gpu
+
+    gpu = detect_gpu()
+    if not gpu:
+        return 0.0
+    return float(gpu["vram_mb"]) / 1024.0
+
+
+def hardware_profile_name() -> str:
+    """Resolve the active hardware profile."""
+    from ..config import detect_gpu, get_settings
+
+    requested = (get_settings().hardware_profile or "auto").strip().lower()
+    if requested not in ("", "auto"):
+        return requested
+
+    gpu = detect_gpu()
+    if not gpu:
+        return "generic"
+
+    name = str(gpu.get("name", "")).lower()
+    physical_gb = float(gpu.get("vram_mb", 0)) / 1024.0
+    if "rtx 3060" in name and 10.5 <= physical_gb <= 12.5:
+        return "rtx3060_12gb"
+    return "generic"
+
+
 def low_vram() -> bool:
-    """True when a budget of 8GB or less is configured — adapters switch to
-    offloading/chunking and the runner unloads models between stages."""
-    b = vram_budget_gb()
+    """Aggressive low-memory mode for <=8GB effective VRAM."""
+    b = runtime_vram_gb()
     return 0 < b <= 8
+
+
+def constrained_vram() -> bool:
+    """Moderate-memory mode for the <=12GB class.
+
+    A 12GB 3060 gets stage isolation and moderate chunks without being forced
+    down to the quality settings intended for 8GB cards.
+    """
+    b = runtime_vram_gb()
+    return hardware_profile_name() == "rtx3060_12gb" or (0 < b <= 12.5)
+
+
+def should_unload_between_stages() -> bool:
+    """Whether completed heavyweight model stages must release their model."""
+    from ..config import get_settings
+
+    override = get_settings().force_stage_unload
+    if override is not None:
+        return bool(override)
+    return constrained_vram()
+
+
+def runtime_vram_policy() -> dict:
+    """Serializable policy summary for diagnostics and the system endpoint."""
+    return {
+        "hardware_profile": hardware_profile_name(),
+        "runtime_vram_gb": round(runtime_vram_gb(), 2),
+        "hard_cap_gb": vram_budget_gb(),
+        "low_vram": low_vram(),
+        "constrained_vram": constrained_vram(),
+        "stage_unload": should_unload_between_stages(),
+    }
 
 
 # CUDA context + cuDNN workspace etc. live outside torch's allocator but
@@ -124,9 +192,7 @@ _CUDA_OVERHEAD_GB = 0.9
 
 
 def apply_vram_budget() -> None:
-    """Hard-cap torch CUDA allocations so total process usage (allocator +
-    CUDA context overhead) stays within the configured budget. Called by
-    adapters right before loading a model. Safe to call repeatedly."""
+    """Hard-cap torch CUDA allocations when an explicit budget is configured."""
     budget = vram_budget_gb()
     if budget <= 0:
         return

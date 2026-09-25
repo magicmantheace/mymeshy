@@ -25,6 +25,7 @@ from ..base import (
     apply_vram_budget,
     free_cuda_memory,
     low_vram,
+    should_unload_between_stages,
 )
 
 # Overridable for the bigger model: tencent/Hunyuan3D-2
@@ -140,8 +141,9 @@ class Hunyuan3DImageTo3D(ImageTo3DAdapter):
             progress(1.0, f"Shape ready (paint skipped: {paint_reason})")
             return MeshResult(mesh=mesh, textured=False)
 
-        if low_vram():
-            # Shape and paint models never share the GPU within the budget.
+        # On the RTX 3060 12GB profile, shape and paint must never share the
+        # GPU even though this card is above the <=8GB low_vram threshold.
+        if should_unload_between_stages():
             self._unload_shape()
 
         paint = self._load_paint(progress)
@@ -195,7 +197,7 @@ class HunyuanPaintTexturing(TexturingAdapter):
             if not ok:
                 raise RuntimeError(f"Text-conditioned texturing needs SDXL-Turbo: {reason}")
             image = self._t2i.generate(prompt, opts, lambda p, m: progress(p * 0.3, m))
-            if low_vram():
+            if should_unload_between_stages():
                 self._t2i.unload()
 
         if self._paint is None:

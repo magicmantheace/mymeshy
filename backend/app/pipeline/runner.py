@@ -22,7 +22,7 @@ from PIL import Image
 
 from .. import store
 from . import meshproc, pbr, registry
-from .base import GenOptions, MeshResult, low_vram
+from .base import GenOptions, MeshResult, should_unload_between_stages
 
 log = logging.getLogger("mymeshy.pipeline")
 
@@ -239,7 +239,6 @@ def postprocess_to_asset(
 # --------------------------------------------------------------------------
 # Job entry points
 # --------------------------------------------------------------------------
-
 def run_text_to_3d(
     prompt: str,
     opts: GenOptions,
@@ -253,7 +252,7 @@ def run_text_to_3d(
     t2i = registry.resolve("text_to_image")
     rep = reporter.enter("text_to_image")
     ref_image = t2i.generate(prompt, opts, rep)
-    if low_vram():
+    if should_unload_between_stages():
         t2i.unload()
 
     asset_id, asset_path = store.new_asset(prompt)
@@ -268,7 +267,7 @@ def run_text_to_3d(
     i23d = registry.resolve("image_to_3d", opts.adapter)
     rep = reporter.enter("image_to_3d")
     result = i23d.generate([ref_image], opts, rep)
-    if low_vram():
+    if should_unload_between_stages():
         i23d.unload()
 
     meta = {
@@ -307,7 +306,7 @@ def run_image_to_3d(
     i23d = registry.resolve("image_to_3d", opts.adapter)
     rep = reporter.enter("image_to_3d")
     result = i23d.generate(images, opts, rep)
-    if low_vram():
+    if should_unload_between_stages():
         i23d.unload()
 
     meta = {
@@ -353,7 +352,7 @@ def run_texture(
     tex = registry.resolve("texturing", opts.adapter)
     rep = reporter.enter("texturing")
     result = tex.generate(loaded, prompt, image, opts, rep)
-    if low_vram():
+    if should_unload_between_stages():
         tex.unload()
 
     asset_id, asset_path = store.new_asset(prompt or source_name)

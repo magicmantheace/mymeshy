@@ -20,6 +20,7 @@ from ..base import (
     ProgressFn,
     _torch_cuda_probe,
     apply_vram_budget,
+    constrained_vram,
     free_cuda_memory,
     low_vram,
 )
@@ -80,8 +81,15 @@ class TripoSRImageTo3D(ImageTo3DAdapter):
             model = TSR.from_pretrained(
                 "stabilityai/TripoSR", config_name="config.yaml", weight_name="model.ckpt"
             )
-            # Smaller chunks trade speed for a lower VRAM peak.
-            model.renderer.set_chunk_size(2048 if low_vram() else 8192)
+            # Use a middle tier on <=12GB cards: safer than the 8K default
+            # without dropping all the way to the <=8GB configuration.
+            if low_vram():
+                chunk_size = 2048
+            elif constrained_vram():
+                chunk_size = 4096
+            else:
+                chunk_size = 8192
+            model.renderer.set_chunk_size(chunk_size)
             model.to("cuda")
             self._model = model
         return self._model
@@ -99,8 +107,13 @@ class TripoSRImageTo3D(ImageTo3DAdapter):
             scene_codes = model([image], device="cuda")
             progress(0.6, "Extracting mesh")
             meshes = model.extract_mesh(
-                scene_codes, has_vertex_color=True,
-                resolution=192 if low_vram() else 256,
+                scene_codes,
+                has_vertex_color=True,
+                resolution=(
+                    192 if low_vram()
+                    else 224 if constrained_vram()
+                    else 256
+                ),
             )
         m = meshes[0]
         mesh = trimesh.Trimesh(
