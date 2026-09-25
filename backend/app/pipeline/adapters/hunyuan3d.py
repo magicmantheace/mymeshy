@@ -142,8 +142,10 @@ class Hunyuan3DImageTo3D(ImageTo3DAdapter):
             return MeshResult(mesh=mesh, textured=False)
 
         # On the RTX 3060 12GB profile, shape and paint must never share the
-        # GPU even though this card is above the <=8GB low_vram threshold.
+        # GPU. Drop both the adapter-held and local references before asking
+        # torch to release cached CUDA allocations.
         if should_unload_between_stages():
+            del shape
             self._unload_shape()
 
         paint = self._load_paint(progress)

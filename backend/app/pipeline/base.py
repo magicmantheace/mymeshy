@@ -114,19 +114,21 @@ def vram_budget_gb() -> float:
 def runtime_vram_gb() -> float:
     """Effective VRAM for scheduling decisions.
 
-    An explicit allocator budget wins. Otherwise this uses physical VRAM from
-    nvidia-smi. This intentionally does not hard-cap torch on detected cards.
+    An explicit allocator budget can reduce usable VRAM but can never make a
+    physical GPU larger. Without a hard cap, scheduling uses physical VRAM
+    reported by nvidia-smi. Detection never changes torch's allocator by itself.
     """
     configured = vram_budget_gb()
-    if configured > 0:
-        return configured
 
     from ..config import detect_gpu
 
     gpu = detect_gpu()
-    if not gpu:
-        return 0.0
-    return float(gpu["vram_mb"]) / 1024.0
+    physical = float(gpu["vram_mb"]) / 1024.0 if gpu else 0.0
+    if configured > 0 and physical > 0:
+        return min(configured, physical)
+    if configured > 0:
+        return configured
+    return physical
 
 
 def hardware_profile_name() -> str:
