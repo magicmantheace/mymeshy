@@ -13,6 +13,7 @@ import numpy as np
 import trimesh
 from PIL import Image
 
+from ...hardware import should_unload_between_stages, triposr_chunk_size, triposr_resolution
 from ..base import (
     GenOptions,
     ImageTo3DAdapter,
@@ -37,7 +38,6 @@ def _install_torchmcubes_shim() -> None:
         return
     import types
 
-    import numpy as np
     import torch
     from skimage import measure
 
@@ -80,8 +80,7 @@ class TripoSRImageTo3D(ImageTo3DAdapter):
             model = TSR.from_pretrained(
                 "stabilityai/TripoSR", config_name="config.yaml", weight_name="model.ckpt"
             )
-            # Smaller chunks trade speed for a lower VRAM peak.
-            model.renderer.set_chunk_size(2048 if low_vram() else 8192)
+            model.renderer.set_chunk_size(triposr_chunk_size())
             model.to("cuda")
             self._model = model
         return self._model
@@ -100,7 +99,7 @@ class TripoSRImageTo3D(ImageTo3DAdapter):
             progress(0.6, "Extracting mesh")
             meshes = model.extract_mesh(
                 scene_codes, has_vertex_color=True,
-                resolution=192 if low_vram() else 256,
+                resolution=triposr_resolution(),
             )
         m = meshes[0]
         mesh = trimesh.Trimesh(
@@ -114,7 +113,10 @@ class TripoSRImageTo3D(ImageTo3DAdapter):
         # TripoSR outputs z-up; rotate to y-up.
         mesh.apply_transform(trimesh.transformations.rotation_matrix(-np.pi / 2, [1, 0, 0]))
         progress(1.0, "TripoSR mesh ready")
-        return MeshResult(mesh=mesh, textured=False)
+        result = MeshResult(mesh=mesh, textured=False)
+        if should_unload_between_stages():
+            self.unload()
+        return result
 
     def unload(self) -> None:
         if self._model is not None:
