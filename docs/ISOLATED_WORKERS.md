@@ -146,11 +146,14 @@ A real RTX 3060 validation should then monitor `nvidia-smi` across these boundar
 
 The most important success criterion is that Shape VRAM is gone before Paint starts.
 
-## Next migrations
+## Remaining worker work
 
-1. benchmark Hunyuan Shape/Paint on the RTX 3060 and tune settings
-2. add the TRELLIS.2 low-VRAM worker in its own environment
-3. isolate SDXL concept generation only if measurements show it is useful
-4. replace placeholder texture rebaking with proper material preservation / texel-space baking
+1. benchmark Hunyuan Shape/Paint and TripoSR on the target RTX 3060
+2. add a TRELLIS.2 quality worker only if upstream/runtime validation supports a practical 12GB configuration
+3. isolate SDXL concept generation only if measurements show it materially improves VRAM recovery
 
-Each worker should preserve the same file + JSON boundary rather than importing one model environment into another.
+Native adapter albedo + UV layouts are now preserved when available. Full native
+multi-channel PBR preservation remains separate asset-quality work rather than a
+worker-isolation requirement.
+
+Each future worker should preserve the same file + JSON boundary rather than importing one model environment into another.
