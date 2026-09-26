@@ -249,6 +249,23 @@ Tools exposed: `text_to_3d`, `image_to_3d`, `texture_mesh`, `get_job`,
 > ./concept/props.png — generate it and export GLB + texture maps into
 > ./Assets/Models/Chest"
 
+## Generation checkpoints and post-processing retry
+
+Text-to-3D and image-to-3D jobs save the expensive raw model output before mesh
+cleanup, UV work, PBR generation, and export. If one of those downstream stages
+fails, retry it without running the AI model again:
+
+`POST /api/assets/{asset_id}/resume`
+
+The retry uses the generation options saved with the checkpoint. It does not
+rerun text-to-image, background removal, or image-to-3D. Checkpoints are also
+kept after successful jobs so post-processing can be retried later. Run the
+GPU-free checkpoint contract test with:
+
+```powershell
+.venv\Scripts\python.exe scripts\test_checkpoint_resume.py
+```
+
 ## API
 
 Interactive docs at http://127.0.0.1:8420/docs. Highlights:
