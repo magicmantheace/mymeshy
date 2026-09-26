@@ -195,19 +195,33 @@ def _load_mesh_result(
         raise RuntimeError("worker produced an invalid triangle mesh")
 
     albedo = None
+    material = getattr(getattr(loaded, "visual", None), "material", None)
     if textured and albedo_path is not None and albedo_path.is_file():
         with Image.open(albedo_path) as image:
             albedo = image.convert("RGB").copy()
-    elif textured:
-        material = getattr(getattr(loaded, "visual", None), "material", None)
-        if material is not None:
-            albedo = getattr(material, "baseColorTexture", None)
-            if albedo is None:
-                albedo = getattr(material, "image", None)
+    elif textured and material is not None:
+        albedo = getattr(material, "baseColorTexture", None)
+        if albedo is None:
+            albedo = getattr(material, "image", None)
+
+    native_maps: dict[str, Image.Image] = {}
+    if textured and material is not None:
+        for key, attr in (
+            ("normal", "normalTexture"),
+            ("metallic_roughness", "metallicRoughnessTexture"),
+            ("occlusion", "occlusionTexture"),
+        ):
+            image = getattr(material, attr, None)
+            if image is not None:
+                if not isinstance(image, Image.Image):
+                    image = Image.fromarray(image)
+                native_maps[key] = image.copy()
+
     return MeshResult(
         mesh=loaded,
         albedo=albedo,
         textured=textured and albedo is not None,
+        native_maps=native_maps,
         extras=extras,
     )
 
