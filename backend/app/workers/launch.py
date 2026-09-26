@@ -171,7 +171,13 @@ def _read_worker_result(
     return result
 
 
-def _load_mesh_result(mesh_path: Path, *, textured: bool, extras: dict) -> MeshResult:
+def _load_mesh_result(
+    mesh_path: Path,
+    *,
+    textured: bool,
+    extras: dict,
+    albedo_path: Path | None = None,
+) -> MeshResult:
     if not mesh_path.is_file():
         raise RuntimeError(f"worker mesh is missing: {mesh_path}")
     loaded = trimesh.load(mesh_path, force="mesh")
@@ -179,13 +185,21 @@ def _load_mesh_result(mesh_path: Path, *, textured: bool, extras: dict) -> MeshR
         raise RuntimeError("worker produced an invalid triangle mesh")
 
     albedo = None
-    if textured:
+    if textured and albedo_path is not None and albedo_path.is_file():
+        with Image.open(albedo_path) as image:
+            albedo = image.convert("RGB").copy()
+    elif textured:
         material = getattr(getattr(loaded, "visual", None), "material", None)
         if material is not None:
             albedo = getattr(material, "baseColorTexture", None)
             if albedo is None:
                 albedo = getattr(material, "image", None)
-    return MeshResult(mesh=loaded, albedo=albedo, textured=textured and albedo is not None, extras=extras)
+    return MeshResult(
+        mesh=loaded,
+        albedo=albedo,
+        textured=textured and albedo is not None,
+        extras=extras,
+    )
 
 
 def run_triposr_worker(
@@ -331,9 +345,11 @@ def run_hunyuan_paint_worker(
         proc = _invoke_worker("hunyuan_paint", request_path, result_path)
         result = _read_worker_result("hunyuan_paint", proc, result_path)
         progress(1.0, "Isolated Hunyuan paint worker complete")
+        albedo_raw = result.get("albedo_path")
         return _load_mesh_result(
             Path(result["mesh_path"]),
             textured=True,
+            albedo_path=Path(albedo_raw) if albedo_raw else None,
             extras={
                 "worker": "hunyuan_paint",
                 "isolated": True,
