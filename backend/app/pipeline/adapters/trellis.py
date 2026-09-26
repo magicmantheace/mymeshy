@@ -1,9 +1,9 @@
-"""Microsoft TRELLIS image-to-3D adapter.
+"""Legacy Microsoft TRELLIS image-to-3D adapter.
 
-Highest-quality open-source image-to-3D as of early 2026. Officially wants
-16GB VRAM but runs on 12GB cards with fp16 + the smaller sampler settings used
-here. Install from the TRELLIS repo (see README "Installing real models") —
-it is not a plain pip package.
+This in-process Python backend is experimental on the RTX 3060 12 GB reference
+profile and is never auto-selected there. It remains available for explicit
+opt-in on installations that satisfy its runtime requirements. See
+``docs/TRELLIS2_RTX3060.md`` for the separate TRELLIS.2 validation plan.
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ MODEL_ID = "microsoft/TRELLIS-image-large"
 
 class TrellisImageTo3D(ImageTo3DAdapter):
     name = "trellis"
-    description = "Microsoft TRELLIS image-large (best quality, 12-16GB VRAM)"
+    description = "Legacy Microsoft TRELLIS image-large (experimental; explicit opt-in on RTX 3060 12GB)"
 
     def __init__(self) -> None:
         self._pipe = None
