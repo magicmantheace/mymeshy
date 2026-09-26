@@ -284,6 +284,7 @@ def run_text_to_3d(
     opts: GenOptions,
     progress_cb: Callable[[float, str, str], None],
     cancelled: Callable[[], bool],
+    asset_created: Optional[Callable[[str], None]] = None,
 ) -> dict:
     stages = [("text_to_image", 0.15), ("background_removal", 0.05),
               ("image_to_3d", 0.30)] + [(k, w * 0.5) for k, w in POST_STAGES]
@@ -296,6 +297,8 @@ def run_text_to_3d(
         t2i.unload()
 
     asset_id, asset_path = store.new_asset(prompt)
+    if asset_created is not None:
+        asset_created(asset_id)
     ref_image.save(asset_path / "source" / "reference.png")
     (asset_path / "source" / "prompt.txt").write_text(prompt, encoding="utf-8")
 
@@ -325,6 +328,7 @@ def run_image_to_3d(
     opts: GenOptions,
     progress_cb: Callable[[float, str, str], None],
     cancelled: Callable[[], bool],
+    asset_created: Optional[Callable[[str], None]] = None,
 ) -> dict:
     stages = [("background_removal", 0.05), ("image_to_3d", 0.35)] + [
         (k, w * 0.6) for k, w in POST_STAGES
@@ -333,6 +337,8 @@ def run_image_to_3d(
 
     name = image_paths[0].stem
     asset_id, asset_path = store.new_asset(name)
+    if asset_created is not None:
+        asset_created(asset_id)
 
     rep = reporter.enter("background_removal")
     images = []
