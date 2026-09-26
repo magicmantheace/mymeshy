@@ -12,6 +12,7 @@ import sys
 import threading
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 sys.path.insert(0, "backend")
 
@@ -30,6 +31,19 @@ def _gpu_used() -> int:
         capture_output=True, text=True, timeout=5,
     )
     return int(out.stdout.strip().splitlines()[0])
+
+
+def _git_revision(path: Path) -> str | None:
+    if not (path / ".git").exists():
+        return None
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(path), "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=5,
+        )
+        return out.stdout.strip() if out.returncode == 0 else None
+    except (OSError, subprocess.SubprocessError):
+        return None
 
 
 def monitor():
@@ -97,6 +111,11 @@ def main():
             "error": error,
             "adapter": adapter,
             "mode": mode,
+            "source_revisions": {
+                "assetforge": _git_revision(Path(".")),
+                "triposr": _git_revision(Path("external/TripoSR")),
+                "hunyuan3d_2": _git_revision(Path("external/Hunyuan3D-2")),
+            },
             "settings": {
                 "target_polycount": opts.target_polycount,
                 "texture_size": opts.texture_size,
