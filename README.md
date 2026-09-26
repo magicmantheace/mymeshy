@@ -297,10 +297,14 @@ data/
 - One GPU job runs at a time (the worker serializes jobs) — by design for 12 GB cards.
 - FBX export shells out to Blender (`-b --python`); Steam and standard installs
   are auto-detected, override with `MYMESHY_BLENDER_PATH`.
-- Normal/roughness/metallic maps are derived from the baked albedo with
-  classic image-processing heuristics (Materialize-style); AO is geometry-based
-  (voxel ray marching) multiplied with albedo cavity. Hunyuan3D-2.1's PBR paint
-  pipeline can replace this wholesale by adding an adapter.
+- Native adapter albedo/UV layouts are preserved when available. Native normal,
+  metallic-roughness, and occlusion maps are also carried through isolated
+  workers, checkpoints, and final GLB material assembly when supplied by a
+  backend. Missing PBR channels fall back to deterministic image/geometry
+  heuristics rather than discarding native channels that do exist.
+- Official TRELLIS.2 is not currently a supported RTX 3060 quality backend:
+  upstream documents Linux-only testing and a 24 GB minimum. See
+  `docs/TRELLIS2_RTX3060.md` for the evidence gate required before promotion.
 - Mock mode is intentionally simple (silhouette inflation) — it validates the
   entire pipeline without any downloads.
 
