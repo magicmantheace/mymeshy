@@ -48,3 +48,17 @@ Use `MYMESHY_HARDWARE_PROFILE=generic` to disable automatic RTX 3060 behavior fo
 - Replace heuristic texture/PBR reconstruction with native or proper baked material data.
 - Add checkpoint/resume between generation stages.
 - Add Blender geometry and multi-view visual QA.
+
+
+## TripoSR OOM recovery
+
+The RTX 3060 profile normally runs isolated TripoSR at extraction resolution
+`224` with renderer chunk size `4096`. If that short-lived worker reports an
+explicit CUDA allocation OOM, AssetForge retries the stage **once** at the
+existing low-memory preset: resolution `192`, chunk size `2048`.
+
+The retry happens in a fresh worker process, so the failed CUDA context has
+already exited. Non-OOM errors are never retried by this policy, and a second
+OOM is surfaced normally. This is a safety fallback, not evidence that either
+preset has been benchmarked successfully on the reference machine; record real
+hardware results with the repository validation tooling before further tuning.
