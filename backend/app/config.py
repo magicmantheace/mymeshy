@@ -35,6 +35,13 @@ class Settings(BaseSettings):
     # profile's stage-isolation policy.
     force_stage_unload: Optional[bool] = None
 
+    # Heavy model subprocesses. None = hardware profile decides; the RTX 3060
+    # 12GB profile defaults to isolation so model CUDA contexts die between
+    # stages. A per-worker Python may point at a dedicated virtualenv.
+    isolated_workers: Optional[bool] = None
+    worker_timeout_sec: int = 1800
+    triposr_worker_python: str = ""
+
     data_dir: Path = REPO_ROOT / "data"
 
     # GPU memory budget in GB. 0 = unlimited. When set, torch allocations are
@@ -65,12 +72,17 @@ class Settings(BaseSettings):
         return self.data_dir / "uploads"
 
     @property
+    def workers_dir(self) -> Path:
+        return self.data_dir / "workers"
+
+    @property
     def jobs_file(self) -> Path:
         return self.data_dir / "jobs.json"
 
     def ensure_dirs(self) -> None:
         self.assets_dir.mkdir(parents=True, exist_ok=True)
         self.uploads_dir.mkdir(parents=True, exist_ok=True)
+        self.workers_dir.mkdir(parents=True, exist_ok=True)
         # Keep multi-GB model caches on this drive instead of filling C:.
         caches = self.data_dir / "caches"
         for var, sub in (("HF_HOME", "hf"), ("TORCH_HOME", "torch"), ("U2NET_HOME", "u2net")):
