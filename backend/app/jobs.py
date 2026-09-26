@@ -84,6 +84,15 @@ class JobManager:
     def get(self, job_id: str) -> Optional[Job]:
         return self._jobs.get(job_id)
 
+    def link_asset(self, job_id: str, asset_id: str) -> None:
+        """Persist an asset link before expensive/downstream work can fail."""
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None:
+                raise KeyError(f"unknown job: {job_id}")
+            job.asset_id = asset_id
+        self._save()
+
     def list(self) -> list[dict]:
         with self._lock:
             return [self._jobs[i].public() for i in reversed(self._order)]

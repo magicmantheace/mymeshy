@@ -92,7 +92,10 @@ def create_text_to_3d(req: TextTo3DRequest) -> dict:
     opts = _parse_options(json.dumps(req.options) if req.options else None)
 
     def work(job, progress_cb, cancelled):
-        return runner.run_text_to_3d(prompt, opts, progress_cb, cancelled)
+        return runner.run_text_to_3d(
+            prompt, opts, progress_cb, cancelled,
+            asset_created=lambda asset_id: get_job_manager().link_asset(job.id, asset_id),
+        )
 
     job = get_job_manager().submit("text_to_3d", {"prompt": prompt, **opts.__dict__}, work)
     return job.public()
@@ -109,7 +112,10 @@ def create_image_to_3d(
     paths = [_save_upload(up, ALLOWED_IMAGE_EXT) for up in images]
 
     def work(job, progress_cb, cancelled):
-        return runner.run_image_to_3d(paths, opts, progress_cb, cancelled)
+        return runner.run_image_to_3d(
+            paths, opts, progress_cb, cancelled,
+            asset_created=lambda asset_id: get_job_manager().link_asset(job.id, asset_id),
+        )
 
     job = get_job_manager().submit(
         "image_to_3d", {"images": [p.name for p in paths], **opts.__dict__}, work
