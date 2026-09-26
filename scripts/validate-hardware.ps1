@@ -16,6 +16,11 @@ $report = [ordered]@{
     computer = $env:COMPUTERNAME
     gpu = $null
     system = $null
+    source_revisions = [ordered]@{
+        assetforge = $null
+        triposr = $null
+        hunyuan3d_2 = $null
+    }
     errors = @()
 }
 
@@ -38,6 +43,24 @@ try {
     $report.system = Invoke-RestMethod -Uri "$ApiUrl/api/system" -TimeoutSec 10
 } catch {
     $report.errors += "api/system: $($_.Exception.Message)"
+}
+
+foreach ($source in @(
+    @("assetforge", $root),
+    @("triposr", (Join-Path $root "external\TripoSR")),
+    @("hunyuan3d_2", (Join-Path $root "external\Hunyuan3D-2"))
+)) {
+    $name, $path = $source
+    if (Test-Path (Join-Path $path ".git")) {
+        try {
+            $revision = (& git -C $path rev-parse HEAD 2>$null)
+            if ($LASTEXITCODE -eq 0 -and $revision) {
+                $report.source_revisions[$name] = $revision.Trim()
+            }
+        } catch {
+            $report.errors += "$name revision: $($_.Exception.Message)"
+        }
+    }
 }
 
 $report | ConvertTo-Json -Depth 12 | Set-Content -Encoding UTF8 $Output
