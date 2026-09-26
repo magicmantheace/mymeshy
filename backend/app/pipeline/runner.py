@@ -196,33 +196,55 @@ def postprocess_to_asset(
     textures = ["albedo"]
     material_kwargs: dict = {}
     if opts.generate_pbr:
-        rep(0.1, "Computing geometry ambient occlusion")
-        ao_vals = meshproc.vertex_ao(mesh, progress=lambda p, m: rep(0.1 + p * 0.4, m))
-        ao_img_raw, covered = meshproc._rasterize_attribute(
-            uvs, mesh.faces, ao_vals[:, None], size
-        )
-        geo_ao = Image.fromarray(
-            (np.clip(meshproc._dilate(ao_img_raw, covered)[..., 0], 0, 1) * 255).astype(np.uint8),
-            mode="L",
-        )
-        rep(0.6, "Deriving normal / roughness / metallic maps")
-        normal = pbr.smooth_seams(pbr.normal_from_albedo(albedo))
-        roughness = pbr.roughness_from_albedo(albedo)
-        metallic = pbr.metallic_from_albedo(albedo)
-        ao = pbr.ao_map(albedo, geo_ao)
+        native = result.native_maps if preserve_native else {}
+        normal = native.get("normal")
+        orm = native.get("metallic_roughness")
+        native_ao = native.get("occlusion")
 
-        normal.save(tex_dir / "normal.png")
-        roughness.save(tex_dir / "roughness.png")
-        metallic.save(tex_dir / "metallic.png")
-        ao.save(tex_dir / "ao.png")
-        textures += ["normal", "roughness", "metallic", "ao"]
+        if normal is not None:
+            normal.save(tex_dir / "normal.png")
+            textures.append("normal")
+        if orm is not None:
+            orm.save(tex_dir / "metallic_roughness.png")
+            textures.append("metallic_roughness")
+        if native_ao is not None:
+            native_ao.save(tex_dir / "occlusion.png")
+            textures.append("occlusion")
 
-        orm = pbr.pack_orm(ao, roughness, metallic, size)
+        if normal is None or orm is None or native_ao is None:
+            rep(0.1, "Computing fallback PBR channels")
+            ao_vals = meshproc.vertex_ao(mesh, progress=lambda p, m: rep(0.1 + p * 0.4, m))
+            ao_img_raw, covered = meshproc._rasterize_attribute(
+                uvs, mesh.faces, ao_vals[:, None], size
+            )
+            geo_ao = Image.fromarray(
+                (np.clip(meshproc._dilate(ao_img_raw, covered)[..., 0], 0, 1) * 255).astype(np.uint8),
+                mode="L",
+            )
+            if normal is None:
+                normal = pbr.smooth_seams(pbr.normal_from_albedo(albedo))
+                normal.save(tex_dir / "normal.png")
+                textures.append("normal")
+            roughness = pbr.roughness_from_albedo(albedo)
+            metallic = pbr.metallic_from_albedo(albedo)
+            ao = pbr.ao_map(albedo, geo_ao)
+            if orm is None:
+                roughness.save(tex_dir / "roughness.png")
+                metallic.save(tex_dir / "metallic.png")
+                textures += ["roughness", "metallic"]
+                orm = pbr.pack_orm(ao, roughness, metallic, size)
+            if native_ao is None:
+                ao.save(tex_dir / "ao.png")
+                textures.append("ao")
+                native_ao = orm if native.get("metallic_roughness") is not None else pbr.pack_orm(ao, roughness, metallic, size)
+
         material_kwargs = {
             "metallicRoughnessTexture": orm,
-            "occlusionTexture": orm,
+            "occlusionTexture": native_ao,
             "normalTexture": normal,
         }
+        if native:
+            meta["native_pbr_channels"] = sorted(native)
         rep(1.0, "PBR maps ready")
     else:
         rep(1.0, "PBR maps skipped")
