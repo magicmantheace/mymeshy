@@ -6,10 +6,12 @@ Peaks above the configured budget mean offloading isn't holding.
 """
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import threading
 import time
+from datetime import datetime, timezone
 
 sys.path.insert(0, "backend")
 
@@ -55,6 +57,9 @@ def main():
     print(f"GPU baseline (other processes): {peak['baseline']} MiB")
     threading.Thread(target=monitor, daemon=True).start()
     t0 = time.time()
+    status = "failed"
+    error = None
+    meta = None
 
     last = {"stage": None}
 
@@ -65,25 +70,58 @@ def main():
 
     opts = GenOptions(adapter=adapter, target_polycount=20000, texture_size=1024)
 
-    if mode == "text":
-        meta = run_text_to_3d("a wooden treasure chest with brass fittings", opts, cb, lambda: False)
-    else:
-        # synthetic test subject: a simple potion-bottle silhouette
-        img = Image.new("RGBA", (512, 512), (0, 0, 0, 0))
-        d = ImageDraw.Draw(img)
-        d.rounded_rectangle([196, 60, 316, 150], radius=20, fill=(160, 120, 70, 255))   # cork
-        d.ellipse([130, 130, 382, 430], fill=(90, 40, 130, 255))                        # body
-        d.ellipse([180, 180, 280, 280], fill=(140, 80, 190, 255))                       # highlight
-        p = settings.uploads_dir / "test_potion.png"
-        img.save(p)
-        meta = run_image_to_3d([p], opts, cb, lambda: False)
+    try:
+        if mode == "text":
+            meta = run_text_to_3d("a wooden treasure chest with brass fittings", opts, cb, lambda: False)
+        else:
+            # synthetic test subject: a simple potion-bottle silhouette
+            img = Image.new("RGBA", (512, 512), (0, 0, 0, 0))
+            d = ImageDraw.Draw(img)
+            d.rounded_rectangle([196, 60, 316, 150], radius=20, fill=(160, 120, 70, 255))
+            d.ellipse([130, 130, 382, 430], fill=(90, 40, 130, 255))
+            d.ellipse([180, 180, 280, 280], fill=(140, 80, 190, 255))
+            p = settings.uploads_dir / "test_potion.png"
+            img.save(p)
+            meta = run_image_to_3d([p], opts, cb, lambda: False)
+        status = "passed"
+    except Exception as exc:
+        error = f"{type(exc).__name__}: {exc}"
+        raise
+    finally:
+        stop.set()
+        elapsed = time.time() - t0
+        ours = max(0, peak["used"] - peak["baseline"])
+        report = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "status": status,
+            "error": error,
+            "adapter": adapter,
+            "mode": mode,
+            "settings": {
+                "target_polycount": opts.target_polycount,
+                "texture_size": opts.texture_size,
+                "vram_budget_gb": settings.vram_budget_gb,
+            },
+            "runtime_seconds": round(elapsed, 3),
+            "gpu": {
+                "baseline_mib": peak["baseline"],
+                "peak_total_mib": peak["used"],
+                "peak_delta_mib": ours,
+            },
+            "asset_id": meta.get("id") if meta else None,
+            "stats": meta.get("stats") if meta else None,
+            "textures": meta.get("textures") if meta else None,
+        }
+        out_dir = settings.data_dir / "benchmarks"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        out = out_dir / f"real-model-{adapter}-{mode}-{stamp}.json"
+        out.write_text(json.dumps(report, indent=2), encoding="utf-8")
+        print(f"\nBenchmark report: {out}")
+        print(f"Runtime: {elapsed:.0f}s | peak GPU: {peak['used']} MiB total, ~{ours} MiB delta")
+        if meta:
+            print(f"Asset: {meta['id']} | stats: {meta['stats']} | textures: {meta['textures']}")
 
-    stop.set()
-    print(f"\nDONE in {time.time()-t0:.0f}s — asset {meta['id']}")
-    print("stats:", meta["stats"], "| textures:", meta["textures"])
-    ours = peak["used"] - peak["baseline"]
-    print(f"PEAK GPU MEMORY: {peak['used']} MiB total, ~{ours} MiB ours "
-          f"(budget {settings.vram_budget_gb*1024:.0f} MiB)")
 
 
 if __name__ == "__main__":
