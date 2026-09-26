@@ -336,6 +336,39 @@ def run_image_to_3d(
                                 keep_source_uvs=False, fallback_image=images[0])
 
 
+def resume_postprocess(
+    asset_id: str,
+    progress_cb: Callable[[float, str, str], None],
+    cancelled: Callable[[], bool],
+) -> dict:
+    """Resume CPU/post-processing from a durable generation checkpoint."""
+    asset_path = store.asset_dir(asset_id)
+    result, opts, meta = checkpoint.load_generation_checkpoint(asset_path)
+    stages = list(POST_STAGES)
+    reporter = StageReporter(progress_cb, cancelled, stages)
+
+    fallback_image = None
+    for candidate in (
+        asset_path / "source" / "reference_cutout.png",
+        asset_path / "source" / "input_0.png",
+    ):
+        if candidate.is_file():
+            with Image.open(candidate) as image:
+                fallback_image = image.convert("RGBA").copy()
+            break
+    if fallback_image is None:
+        matches = sorted((asset_path / "source").glob("input_0_*.png"))
+        if matches:
+            with Image.open(matches[0]) as image:
+                fallback_image = image.convert("RGBA").copy()
+
+    meta["resumed_from_checkpoint"] = True
+    return postprocess_to_asset(
+        result, opts, reporter, asset_id, asset_path, meta,
+        keep_source_uvs=False, fallback_image=fallback_image,
+    )
+
+
 def run_texture(
     mesh_path: Path,
     prompt: Optional[str],
