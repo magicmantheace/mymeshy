@@ -89,7 +89,7 @@ touching the rest of the app.
 
 | Stage | Adapter | Model | VRAM | Notes |
 |---|---|---|---|---|
-| image→3D | `trellis` | microsoft/TRELLIS-image-large | 12–16 GB | best quality |
+| image→3D | `trellis` | microsoft/TRELLIS-image-large | >12 GB typical | **legacy/experimental on RTX 3060 12 GB; explicit opt-in only** |
 | image→3D | `hunyuan3d` | tencent/Hunyuan3D-2 (mini) | ~6–12 GB | **recommended on 12 GB**, shape + painted texture |
 | image→3D | `triposr` | stabilityai/TripoSR | ~6 GB | fastest, blockout quality |
 | image→3D | `mock` | — (procedural) | none | works out of the box, placeholder quality |
@@ -190,12 +190,18 @@ cd ..\differentiable_renderer
 Uses `tencent/Hunyuan3D-2mini` for shape by default; set
 `MYMESHY_HUNYUAN_SHAPE_MODEL=tencent/Hunyuan3D-2` for the full model.
 
-### TRELLIS (best quality)
+### Legacy TRELLIS (experimental on RTX 3060 12 GB)
 
-Follow the Windows install notes in https://github.com/microsoft/TRELLIS
-(needs CUDA build tools; community forks like `IgorAherne/trellis-stable-projectorz`
-simplify Windows installs). Install into this repo's `.venv` so the
-`trellis` package is importable.
+The in-process `microsoft/TRELLIS-image-large` adapter is retained for explicit
+opt-in, but it is **not auto-selected on the RTX 3060 12 GB reference profile**
+and is not considered a validated quality path for that card. Do not treat its
+presence in the adapter list as a claim that it will fit reliably in 12 GB.
+
+For the separate TRELLIS.2 quality-backend validation plan and the measurements
+required before enabling it automatically, see
+[`docs/TRELLIS2_RTX3060.md`](docs/TRELLIS2_RTX3060.md). Until real hardware
+results justify a change, Hunyuan3D-2 mini remains the balanced RTX 3060 path
+and TripoSR the fast fallback.
 
 ### TripoSR (fastest)
 
