@@ -155,6 +155,16 @@ def probe_worker(name: str) -> tuple[bool, str]:
     return False, detail[-500:]
 
 
+def _is_cuda_oom(detail: str) -> bool:
+    """Classify only explicit CUDA allocation failures as retryable OOMs."""
+    text = detail.lower()
+    return any(marker in text for marker in (
+        "cuda out of memory",
+        "cuda error: out of memory",
+        "cublas_status_alloc_failed",
+    ))
+
+
 def _read_worker_result(
     name: str,
     proc: subprocess.CompletedProcess[str],
@@ -242,7 +252,19 @@ def run_triposr_worker(
 
         progress(0.08, f"TripoSR worker running ({resolution} extraction)")
         proc = _invoke_worker("triposr", request_path, result_path)
-        result = _read_worker_result("triposr", proc, result_path)
+        try:
+            result = _read_worker_result("triposr", proc, result_path)
+        except RuntimeError as exc:
+            if not _is_cuda_oom(str(exc)) or (chunk_size, resolution) == (2048, 192):
+                raise
+            chunk_size, resolution = 2048, 192
+            request["chunk_size"] = chunk_size
+            request["resolution"] = resolution
+            request_path.write_text(json.dumps(request, indent=2), encoding="utf-8")
+            result_path.unlink(missing_ok=True)
+            progress(0.12, "TripoSR CUDA OOM; retrying once with 192 / 2048 safe preset")
+            proc = _invoke_worker("triposr", request_path, result_path)
+            result = _read_worker_result("triposr", proc, result_path)
 
         progress(1.0, "Isolated TripoSR worker complete")
         return _load_mesh_result(
