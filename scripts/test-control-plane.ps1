@@ -1,0 +1,28 @@
+# Run all GPU-free AssetForge control-plane checks from the repo root.
+$ErrorActionPreference = "Stop"
+$root = Split-Path -Parent $PSScriptRoot
+$python = Join-Path $root ".venv\Scripts\python.exe"
+
+if (-not (Test-Path $python)) {
+    Write-Host "Backend venv not found. Run .\scripts\setup.ps1 first." -ForegroundColor Red
+    exit 1
+}
+
+$tests = @(
+    "scripts\test_hardware_policy.py",
+    "scripts\test_worker_framework.py",
+    "scripts\test_checkpoint_resume.py",
+    "scripts\test_asset_validation.py"
+)
+
+foreach ($test in $tests) {
+    Write-Host ">> $test" -ForegroundColor Cyan
+    & $python (Join-Path $root $test)
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "FAILED: $test" -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
+}
+
+Write-Host ""
+Write-Host "All GPU-free control-plane checks passed." -ForegroundColor Green
