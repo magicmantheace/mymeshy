@@ -37,10 +37,12 @@ class Settings(BaseSettings):
 
     # Heavy model subprocesses. None = hardware profile decides; the RTX 3060
     # 12GB profile defaults to isolation so model CUDA contexts die between
-    # stages. A per-worker Python may point at a dedicated virtualenv.
+    # stages. Per-worker Python paths may point at dedicated virtualenvs.
     isolated_workers: Optional[bool] = None
     worker_timeout_sec: int = 1800
     triposr_worker_python: str = ""
+    hunyuan_shape_worker_python: str = ""
+    hunyuan_paint_worker_python: str = ""
 
     data_dir: Path = REPO_ROOT / "data"
 
