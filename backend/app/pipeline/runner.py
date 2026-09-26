@@ -106,6 +106,17 @@ def postprocess_to_asset(
     fallback_image: Optional[Image.Image] = None,
 ) -> dict:
     raw = result.mesh
+    source_uvs = getattr(getattr(raw, "visual", None), "uv", None)
+    preserve_native = (
+        not keep_source_uvs
+        and result.textured
+        and result.albedo is not None
+        and source_uvs is not None
+        and len(source_uvs) == len(raw.vertices)
+    )
+    if preserve_native:
+        keep_source_uvs = True
+        meta["texture_pipeline"] = "native_preserved"
 
     # Geometry-only adapters (e.g. Hunyuan shape without the paint pipeline)
     # still get a real albedo: project the reference image onto the mesh.
@@ -160,8 +171,13 @@ def postprocess_to_asset(
     rep = reporter.enter("texture_bake")
     size = opts.texture_size
     if result.albedo is not None and keep_source_uvs:
-        albedo = result.albedo.convert("RGB").resize((size, size), Image.LANCZOS)
-        rep(1.0, "Used adapter-provided albedo")
+        albedo = result.albedo.convert("RGB")
+        if preserve_native:
+            size = max(albedo.size)
+            rep(1.0, "Preserved adapter-provided albedo and native UVs")
+        else:
+            albedo = albedo.resize((size, size), Image.LANCZOS)
+            rep(1.0, "Used adapter-provided albedo")
     elif source_for_transfer is not None:
         albedo = meshproc.bake_texture_to_atlas(
             source_for_transfer, mesh, uvs, size,
