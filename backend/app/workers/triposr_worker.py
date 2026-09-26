@@ -55,7 +55,6 @@ def _probe() -> tuple[bool, str]:
 def _apply_hard_cap(hard_cap_gb: float) -> None:
     if hard_cap_gb <= 0:
         return
-    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
     import torch
 
     total_gb = torch.cuda.get_device_properties(0).total_memory / 1024**3
@@ -66,6 +65,14 @@ def _apply_hard_cap(hard_cap_gb: float) -> None:
 
 
 def _run(request_path: Path, result_path: Path) -> None:
+    # Read allocator policy before importing torch / touching CUDA. PyTorch's
+    # allocator environment variables are only reliable when set before CUDA
+    # initialization in this fresh worker process.
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    hard_cap_gb = float(request.get("hard_cap_gb") or 0)
+    if hard_cap_gb > 0:
+        os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
     import numpy as np
     import torch
     import trimesh
@@ -74,9 +81,7 @@ def _run(request_path: Path, result_path: Path) -> None:
     ok, reason = _probe()
     if not ok:
         raise RuntimeError(reason)
-
-    request = json.loads(request_path.read_text(encoding="utf-8"))
-    _apply_hard_cap(float(request.get("hard_cap_gb") or 0))
+    _apply_hard_cap(hard_cap_gb)
 
     _install_torchmcubes_shim()
     from tsr.system import TSR
