@@ -24,8 +24,10 @@ def _probe() -> tuple[bool, str]:
         return False, "hy3dgen is not importable in the Hunyuan paint worker environment"
     if importlib.util.find_spec("custom_rasterizer") is None:
         return False, "custom_rasterizer is not compiled in the Hunyuan paint worker environment"
-    if importlib.util.find_spec("differentiable_renderer") is None:
-        return False, "differentiable_renderer is not compiled in the Hunyuan paint worker environment"
+    # Hunyuan's differentiable_renderer/setup.py builds a top-level extension
+    # named mesh_processor (not a module named differentiable_renderer).
+    if importlib.util.find_spec("mesh_processor") is None:
+        return False, "mesh_processor is not compiled in the Hunyuan paint worker environment"
     return True, ""
 
 
