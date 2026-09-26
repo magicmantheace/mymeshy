@@ -369,8 +369,14 @@ def worker_policy_summary() -> dict:
             separate = Path(python_executable).resolve() != Path(sys.executable).resolve()
         except OSError:
             separate = python_executable != sys.executable
+        python_exists = Path(python_executable).is_file()
+        external = _EXTERNAL_REPOS.get(name)
+        source_exists = external is None or external.is_dir()
         workers[name] = {
             "python": python_executable,
+            "python_exists": python_exists,
+            "external_source_exists": source_exists,
+            "configured": python_exists and source_exists,
             "separate_environment": separate,
         }
     return {
