@@ -34,10 +34,11 @@ if (-not (Test-Path "$root\external\TripoSR")) {
 
 Write-Host ""
 Write-Host "TripoSR isolated worker ready." -ForegroundColor Green
-Write-Host "Add this to .env (or leave it there if already configured):" -ForegroundColor Yellow
+Write-Host "Add these lines to .env:" -ForegroundColor Yellow
 Write-Host "MYMESHY_ISOLATED_WORKERS=true"
 Write-Host "MYMESHY_TRIPOSR_WORKER_PYTHON=.workers\triposr\Scripts\python.exe"
 Write-Host ""
-Write-Host "Probe command:" -ForegroundColor Cyan
-Write-Host '& ".workers\triposr\Scripts\python.exe" -m app.workers.triposr_worker --probe'
-Write-Host "(The backend supplies PYTHONPATH automatically; use /api/system to verify adapter availability.)"
+Write-Host "Restart the backend and inspect /api/system." -ForegroundColor Cyan
+Write-Host "The TripoSR adapter probe is executed inside this worker environment."
+Write-Host "For a GPU-free process-isolation check run:"
+Write-Host ".venv\Scripts\python.exe scripts\test_worker_framework.py"
