@@ -266,6 +266,22 @@ GPU-free checkpoint contract test with:
 .venv\Scripts\python.exe scripts\test_checkpoint_resume.py
 ```
 
+## Verification
+
+After base setup, run all GPU-free control-plane checks with:
+
+```powershell
+.\scripts\test-control-plane.ps1
+```
+
+This verifies hardware-policy selection, isolated-worker plumbing and OOM
+classification, generation-checkpoint round trips (including native PBR maps),
+and finished-asset structural validation. It does **not** load CUDA models.
+
+For real-model validation on the target machine, use
+`scripts/validate-hardware.ps1` and `scripts/real_model_test.py`; those reports
+are written under `data/benchmarks` and include source revisions.
+
 ## API
 
 Interactive docs at http://127.0.0.1:8420/docs. Highlights:
