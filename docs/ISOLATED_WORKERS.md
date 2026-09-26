@@ -110,6 +110,14 @@ That builds Hunyuan's `custom_rasterizer` and `differentiable_renderer` inside t
 - Python executable for Hunyuan Shape
 - Python executable for Hunyuan Paint
 - whether each executable is separate from the backend interpreter
+- whether the configured Python executable exists
+- whether the required external model source checkout exists
+- a `configured` summary combining those static checks
+
+These are configuration-readiness checks, not a claim that CUDA/model loading has
+already succeeded. Adapter availability in the same `/api/system` response
+performs the model-runtime probe. This distinction avoids presenting a worker as
+GPU-ready merely because a Python path was configured.
 
 This should be checked before GPU benchmarking.
 
