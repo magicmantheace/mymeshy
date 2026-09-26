@@ -1,10 +1,9 @@
 """Tencent Hunyuan3D-2 adapters: shape generation + texture painting.
 
-Recommended primary on 12GB cards: the *2mini* shape model runs in ~5-6GB and
-the paint pipeline produces genuinely good textures for arbitrary meshes —
-which also powers the "texture an existing mesh" feature.
-
-Install the ``hy3dgen`` package from the Hunyuan3D-2 repo (see README).
+On the RTX 3060 reference profile, Shape and Paint run in separate short-lived
+worker processes so they never share a CUDA context or dependency lifetime.
+The original in-process implementation remains available when isolation is
+disabled.
 """
 from __future__ import annotations
 
@@ -54,8 +53,7 @@ def _hy3dgen_probe() -> tuple[bool, str]:
 
 
 def _paint_available() -> tuple[bool, str]:
-    """The paint pipeline needs the compiled custom_rasterizer CUDA extension
-    (requires the CUDA toolkit + MSVC to build) and roughly 10-12GB of VRAM."""
+    """In-process paint availability check."""
     if importlib.util.find_spec("custom_rasterizer") is None:
         return False, "custom_rasterizer not compiled (needs CUDA toolkit; see README)"
     if low_vram():
@@ -63,15 +61,25 @@ def _paint_available() -> tuple[bool, str]:
     return True, ""
 
 
+def _isolated_enabled() -> bool:
+    from ...workers.launch import isolated_workers_enabled
+
+    return isolated_workers_enabled()
+
+
 class Hunyuan3DImageTo3D(ImageTo3DAdapter):
     name = "hunyuan3d"
-    description = "Tencent Hunyuan3D-2 (shape + paint, ~6-12GB VRAM, Windows-friendly)"
+    description = "Tencent Hunyuan3D-2 (isolated shape + paint on RTX 3060)"
 
     def __init__(self) -> None:
         self._shape = None
         self._paint = None
 
     def probe(self) -> tuple[bool, str]:
+        if _isolated_enabled():
+            from ...workers.launch import probe_worker
+
+            return probe_worker("hunyuan_shape")
         return _hy3dgen_probe()
 
     def _load_shape(self, progress: ProgressFn):
@@ -106,9 +114,37 @@ class Hunyuan3DImageTo3D(ImageTo3DAdapter):
     def generate(
         self, images: Sequence[Image.Image], opts: GenOptions, progress: ProgressFn
     ) -> MeshResult:
+        image = images[0].convert("RGBA")
+
+        if _isolated_enabled():
+            from ...workers.launch import (
+                probe_worker,
+                run_hunyuan_paint_worker,
+                run_hunyuan_shape_worker,
+            )
+
+            shape = run_hunyuan_shape_worker(
+                images,
+                opts,
+                lambda p, m: progress(p * 0.58, m),
+            )
+            paint_ok, paint_reason = probe_worker("hunyuan_paint")
+            if not paint_ok:
+                progress(1.0, f"Shape ready (paint worker unavailable: {paint_reason})")
+                return shape
+
+            painted = run_hunyuan_paint_worker(
+                shape.mesh,
+                image,
+                opts,
+                lambda p, m: progress(0.58 + p * 0.42, m),
+            )
+            painted.extras["shape_worker_pid"] = shape.extras.get("worker_pid")
+            painted.extras["shape_model"] = shape.extras.get("shape_model")
+            return painted
+
         import torch
 
-        image = images[0].convert("RGBA")
         shape = self._load_shape(progress)
         progress(0.1, "Generating shape (flow-matching diffusion)")
         generator = (
@@ -116,14 +152,11 @@ class Hunyuan3DImageTo3D(ImageTo3DAdapter):
         )
         kwargs = {}
         if low_vram():
-            # Coarser decode volume and smaller query batches: the biggest
-            # VRAM lever in the shape VAE, modest quality cost.
             kwargs = {"octree_resolution": 256, "num_chunks": 4000}
         mesh = shape(image=image, generator=generator, **kwargs)[0]
         if not isinstance(mesh, trimesh.Trimesh):
             mesh = trimesh.Trimesh(vertices=mesh.vertices, faces=mesh.faces, process=True)
 
-        # Hunyuan's own cleanup helpers before painting.
         try:
             from hy3dgen.shapegen import FaceReducer, FloaterRemover, DegenerateFaceRemover
 
@@ -132,18 +165,13 @@ class Hunyuan3DImageTo3D(ImageTo3DAdapter):
             mesh = DegenerateFaceRemover()(mesh)
             mesh = FaceReducer()(mesh, max_facenum=max(opts.target_polycount, 40000))
         except Exception:
-            pass  # cleanup is best-effort; our own pipeline cleans up too
+            pass
 
         paint_ok, paint_reason = _paint_available()
         if not paint_ok:
-            # Geometry-only result: the runner projects the reference image
-            # onto the mesh as fallback albedo.
             progress(1.0, f"Shape ready (paint skipped: {paint_reason})")
             return MeshResult(mesh=mesh, textured=False)
 
-        # On the RTX 3060 12GB profile, shape and paint must never share the
-        # GPU. Drop both the adapter-held and local references before asking
-        # torch to release cached CUDA allocations.
         if should_unload_between_stages():
             del shape
             self._unload_shape()
@@ -155,11 +183,15 @@ class Hunyuan3DImageTo3D(ImageTo3DAdapter):
         albedo = None
         material = getattr(getattr(mesh, "visual", None), "material", None)
         if material is not None:
-            albedo = getattr(material, "baseColorTexture", None) or getattr(material, "image", None)
+            albedo = getattr(material, "baseColorTexture", None)
+            if albedo is None:
+                albedo = getattr(material, "image", None)
         progress(1.0, "Hunyuan3D mesh ready")
         return MeshResult(mesh=mesh, albedo=albedo, textured=albedo is not None)
 
     def unload(self) -> None:
+        # Isolated workers already exited; these fields only matter for the
+        # explicitly selected in-process fallback.
         self._shape = None
         self._paint = None
         free_cuda_memory()
@@ -167,13 +199,17 @@ class Hunyuan3DImageTo3D(ImageTo3DAdapter):
 
 class HunyuanPaintTexturing(TexturingAdapter):
     name = "hunyuan_paint"
-    description = "Hunyuan3D-2 paint pipeline for texturing existing meshes"
+    description = "Hunyuan3D-2 paint pipeline (isolated worker on RTX 3060)"
 
     def __init__(self) -> None:
         self._paint = None
         self._t2i = None
 
     def probe(self) -> tuple[bool, str]:
+        if _isolated_enabled():
+            from ...workers.launch import probe_worker
+
+            return probe_worker("hunyuan_paint")
         ok, reason = _hy3dgen_probe()
         if not ok:
             return False, reason
@@ -190,7 +226,6 @@ class HunyuanPaintTexturing(TexturingAdapter):
         if image is None:
             if not prompt:
                 raise ValueError("Texturing needs a prompt or a reference image")
-            # Hunyuan paint is image-conditioned: synthesize the reference first.
             from .sdxl_turbo import SdxlTurboTextToImage
 
             if self._t2i is None:
@@ -201,6 +236,11 @@ class HunyuanPaintTexturing(TexturingAdapter):
             image = self._t2i.generate(prompt, opts, lambda p, m: progress(p * 0.3, m))
             if should_unload_between_stages():
                 self._t2i.unload()
+
+        if _isolated_enabled():
+            from ...workers.launch import run_hunyuan_paint_worker
+
+            return run_hunyuan_paint_worker(mesh, image, opts, progress)
 
         if self._paint is None:
             from hy3dgen.texgen import Hunyuan3DPaintPipeline
@@ -214,7 +254,9 @@ class HunyuanPaintTexturing(TexturingAdapter):
         albedo = None
         material = getattr(getattr(painted, "visual", None), "material", None)
         if material is not None:
-            albedo = getattr(material, "baseColorTexture", None) or getattr(material, "image", None)
+            albedo = getattr(material, "baseColorTexture", None)
+            if albedo is None:
+                albedo = getattr(material, "image", None)
         progress(1.0, "Texture ready")
         return MeshResult(mesh=painted, albedo=albedo, textured=albedo is not None)
 
