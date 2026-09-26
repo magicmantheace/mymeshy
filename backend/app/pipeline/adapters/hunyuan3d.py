@@ -27,11 +27,9 @@ from ..base import (
     should_unload_between_stages,
 )
 
-# Overridable for the bigger model: tencent/Hunyuan3D-2
 SHAPE_MODEL = os.environ.get("MYMESHY_HUNYUAN_SHAPE_MODEL", "tencent/Hunyuan3D-2mini")
 PAINT_MODEL = os.environ.get("MYMESHY_HUNYUAN_PAINT_MODEL", "tencent/Hunyuan3D-2")
 
-# Each HF repo nests its DiT weights in a differently named subfolder.
 _SHAPE_SUBFOLDERS = {
     "Hunyuan3D-2": "hunyuan3d-dit-v2-0",
     "Hunyuan3D-2mini": "hunyuan3d-dit-v2-mini",
@@ -128,6 +126,10 @@ class Hunyuan3DImageTo3D(ImageTo3DAdapter):
                 opts,
                 lambda p, m: progress(p * 0.58, m),
             )
+            if low_vram():
+                progress(1.0, "Shape ready (paint skipped: configured VRAM budget is <=8GB)")
+                return shape
+
             paint_ok, paint_reason = probe_worker("hunyuan_paint")
             if not paint_ok:
                 progress(1.0, f"Shape ready (paint worker unavailable: {paint_reason})")
@@ -190,8 +192,6 @@ class Hunyuan3DImageTo3D(ImageTo3DAdapter):
         return MeshResult(mesh=mesh, albedo=albedo, textured=albedo is not None)
 
     def unload(self) -> None:
-        # Isolated workers already exited; these fields only matter for the
-        # explicitly selected in-process fallback.
         self._shape = None
         self._paint = None
         free_cuda_memory()
@@ -206,6 +206,8 @@ class HunyuanPaintTexturing(TexturingAdapter):
         self._t2i = None
 
     def probe(self) -> tuple[bool, str]:
+        if low_vram():
+            return False, "paint pipeline does not fit the configured VRAM budget (needs ~10-12GB)"
         if _isolated_enabled():
             from ...workers.launch import probe_worker
 
@@ -223,6 +225,9 @@ class HunyuanPaintTexturing(TexturingAdapter):
         opts: GenOptions,
         progress: ProgressFn,
     ) -> MeshResult:
+        if low_vram():
+            raise RuntimeError("Hunyuan Paint requires more than the configured <=8GB VRAM budget")
+
         if image is None:
             if not prompt:
                 raise ValueError("Texturing needs a prompt or a reference image")
