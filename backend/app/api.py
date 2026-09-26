@@ -171,6 +171,22 @@ def get_job(job_id: str) -> dict:
     return job.public()
 
 
+@router.post("/assets/{asset_id}/resume")
+def resume_asset(asset_id: str) -> dict:
+    """Retry post-processing without rerunning the expensive generation model."""
+    asset_path = store.asset_dir(asset_id)
+    if not (asset_path / "generation_checkpoint.json").is_file():
+        raise HTTPException(404, "generation checkpoint not found for asset")
+
+    def work(job, progress_cb, cancelled):
+        return runner.resume_postprocess(asset_id, progress_cb, cancelled)
+
+    job = get_job_manager().submit(
+        "resume_postprocess", {"asset_id": asset_id}, work
+    )
+    return job.public()
+
+
 @router.post("/jobs/{job_id}/cancel")
 def cancel_job(job_id: str) -> dict:
     job = get_job_manager().cancel(job_id)
