@@ -49,6 +49,11 @@ class MeshResult:
     albedo: Optional[Image.Image] = None
     # True if mesh.visual has usable UVs + texture already.
     textured: bool = False
+    # Native material maps supplied by an adapter/worker. Supported keys are
+    # "normal", "metallic_roughness" (glTF packed G/B), and "occlusion".
+    # Keeping these separate from albedo lets post-processing preserve real PBR
+    # data instead of replacing it with heuristics.
+    native_maps: dict[str, Image.Image] = field(default_factory=dict)
     extras: dict = field(default_factory=dict)
 
 
