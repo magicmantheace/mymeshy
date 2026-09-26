@@ -236,7 +236,7 @@ def postprocess_to_asset(
             if native_ao is None:
                 ao.save(tex_dir / "ao.png")
                 textures.append("ao")
-                native_ao = orm if native.get("metallic_roughness") is not None else pbr.pack_orm(ao, roughness, metallic, size)
+                native_ao = ao
 
         material_kwargs = {
             "metallicRoughnessTexture": orm,
