@@ -33,6 +33,11 @@ def main() -> None:
     for name in expected:
         assert name in summary, f"{name} missing from worker policy summary"
         assert summary[name]["python"], f"{name} has no Python executable"
+        assert isinstance(summary[name]["python_exists"], bool)
+        assert isinstance(summary[name]["external_source_exists"], bool)
+        assert summary[name]["configured"] == (
+            summary[name]["python_exists"] and summary[name]["external_source_exists"]
+        )
 
     with tempfile.TemporaryDirectory(prefix="assetforge-worker-test-") as td:
         work = Path(td)
