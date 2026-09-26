@@ -20,7 +20,7 @@ MODEL_ID = "microsoft/TRELLIS-image-large"
 
 class TrellisImageTo3D(ImageTo3DAdapter):
     name = "trellis"
-    description = "Microsoft TRELLIS image-large (best quality, 12-16GB VRAM)"
+    description = "Legacy Microsoft TRELLIS image-large (experimental; explicit opt-in on RTX 3060 12GB)"
 
     def __init__(self) -> None:
         self._pipe = None
