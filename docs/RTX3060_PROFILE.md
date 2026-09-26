@@ -40,15 +40,23 @@ MYMESHY_VRAM_BUDGET_GB=0
 
 Use `MYMESHY_HARDWARE_PROFILE=generic` to disable automatic RTX 3060 behavior for comparison testing.
 
-## Next work
+## Current implementation status
 
-- Move heavyweight model backends into isolated worker processes/environments.
-- Add measured per-stage peak VRAM and execution-time telemetry.
-- Add a TRELLIS.2 low-VRAM worker.
-- Replace heuristic texture/PBR reconstruction with native or proper baked material data.
-- Add checkpoint/resume between generation stages.
-- Add Blender geometry and multi-view visual QA.
+Implemented for the RTX 3060 reference profile:
 
+- isolated TripoSR, Hunyuan Shape, and Hunyuan Paint worker processes
+- generation-boundary checkpoints with post-processing resume
+- structured real-model/hardware benchmark reports with source revisions
+- one-shot TripoSR CUDA-OOM fallback to the 192 / 2048 low-memory preset
+- finished-asset structural validation before jobs are marked successful
+
+Still requires repository work or physical validation:
+
+- benchmark Hunyuan Shape/Paint and TripoSR on the target RTX 3060 and tune from evidence
+- add a validated TRELLIS.2 quality worker if upstream/runtime testing proves 12GB practical
+- preserve full native PBR material channels where adapters provide them; current native preservation is primarily UV + albedo
+- add deeper Blender geometry/material QA where it catches issues the deterministic validator cannot
+- isolate SDXL concept generation only if measurements show process isolation materially helps
 
 ## TripoSR OOM recovery
 
