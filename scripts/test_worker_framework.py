@@ -16,10 +16,24 @@ ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 sys.path.insert(0, str(BACKEND))
 
-from app.workers.launch import _worker_env  # noqa: E402
+from app.workers.launch import (  # noqa: E402
+    _WORKER_MODULES,
+    _worker_env,
+    worker_policy_summary,
+)
 
 
 def main() -> None:
+    expected = {"triposr", "hunyuan_shape", "hunyuan_paint"}
+    missing = expected.difference(_WORKER_MODULES)
+    if missing:
+        raise SystemExit(f"missing worker registrations: {sorted(missing)}")
+
+    summary = worker_policy_summary()
+    for name in expected:
+        assert name in summary, f"{name} missing from worker policy summary"
+        assert summary[name]["python"], f"{name} has no Python executable"
+
     with tempfile.TemporaryDirectory(prefix="assetforge-worker-test-") as td:
         work = Path(td)
         request = work / "request.json"
@@ -53,7 +67,7 @@ def main() -> None:
         assert response["payload"] == payload
         assert response["pid"] != os.getpid(), "worker did not run in a child process"
 
-    print("PASS: isolated worker JSON/file IPC ran in a separate process")
+    print("PASS: worker registry + isolated JSON/file IPC are valid")
 
 
 if __name__ == "__main__":
