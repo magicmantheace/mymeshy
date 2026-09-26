@@ -79,6 +79,13 @@ This creates:
 .workers\hunyuan\
 ```
 
+The setup requires both `uv` and Git. It is safe to rerun: existing shallow
+TripoSR and Hunyuan3D-2 checkouts are fetched and reset to their current
+upstream default branch, while non-Git directories at those paths are rejected
+instead of silently reused. The script prints the exact source commit installed
+for each model so a benchmark can be tied to the code that produced it.
+
+
 Add to `.env`:
 
 ```text
