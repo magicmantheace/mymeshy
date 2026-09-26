@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import numpy as np
+
 import trimesh
 from PIL import Image
 
@@ -12,6 +14,21 @@ from .base import GenOptions, MeshResult
 CHECKPOINT_FILE = "generation_checkpoint.json"
 RAW_MESH_FILE = "source/generated_raw.glb"
 RAW_ALBEDO_FILE = "source/generated_albedo.png"
+
+
+def _json_safe(value):
+    """Convert adapter diagnostics/options to durable JSON without breaking a checkpoint."""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, dict):
+        return {str(k): _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(v) for v in value]
+    return repr(value)
 
 
 def save_generation_checkpoint(
@@ -32,9 +49,9 @@ def save_generation_checkpoint(
         "mesh": RAW_MESH_FILE,
         "albedo": RAW_ALBEDO_FILE if albedo_path else None,
         "textured": bool(result.textured),
-        "extras": result.extras,
-        "options": opts.__dict__,
-        "meta": meta,
+        "extras": _json_safe(result.extras),
+        "options": _json_safe(opts.__dict__),
+        "meta": _json_safe(meta),
     }
     (asset_path / CHECKPOINT_FILE).write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
