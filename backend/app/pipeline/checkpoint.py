@@ -14,6 +14,7 @@ from .base import GenOptions, MeshResult
 CHECKPOINT_FILE = "generation_checkpoint.json"
 RAW_MESH_FILE = "source/generated_raw.glb"
 RAW_ALBEDO_FILE = "source/generated_albedo.png"
+RAW_MAP_DIR = "source/generated_material"
 
 
 def _json_safe(value):
@@ -44,11 +45,22 @@ def save_generation_checkpoint(
         albedo_path = asset_path / RAW_ALBEDO_FILE
         result.albedo.convert("RGB").save(albedo_path)
 
+    native_maps = {}
+    for name, image in result.native_maps.items():
+        if name not in {"normal", "metallic_roughness", "occlusion"}:
+            continue
+        rel = f"{RAW_MAP_DIR}/{name}.png"
+        path = asset_path / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        image.save(path)
+        native_maps[name] = rel
+
     payload = {
         "version": 1,
         "mesh": RAW_MESH_FILE,
         "albedo": RAW_ALBEDO_FILE if albedo_path else None,
         "textured": bool(result.textured),
+        "native_maps": native_maps,
         "extras": _json_safe(result.extras),
         "options": _json_safe(opts.__dict__),
         "meta": _json_safe(meta),
@@ -80,10 +92,19 @@ def load_generation_checkpoint(asset_path: Path) -> tuple[MeshResult, GenOptions
         with Image.open(albedo_path) as image:
             albedo = image.convert("RGB").copy()
 
+    native_maps: dict[str, Image.Image] = {}
+    for name, rel in (payload.get("native_maps") or {}).items():
+        path = asset_path / rel
+        if not path.is_file():
+            raise FileNotFoundError(f"checkpoint material map is missing: {path.name}")
+        with Image.open(path) as image:
+            native_maps[name] = image.copy()
+
     result = MeshResult(
         mesh=mesh,
         albedo=albedo,
         textured=bool(payload.get("textured")) and albedo is not None,
+        native_maps=native_maps,
         extras=payload.get("extras") or {},
     )
     return result, GenOptions.from_dict(payload.get("options")), dict(payload.get("meta") or {})

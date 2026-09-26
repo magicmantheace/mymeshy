@@ -25,6 +25,10 @@ def main() -> None:
             mesh=mesh,
             albedo=image,
             textured=True,
+            native_maps={
+                "normal": Image.new("RGB", (32, 16), (128, 128, 255)),
+                "metallic_roughness": Image.new("RGB", (32, 16), (255, 128, 32)),
+            },
             extras={"path": Path("worker/result.glb"), "score": np.float32(0.5)},
         )
         opts = GenOptions(target_polycount=1234, texture_size=512)
@@ -34,6 +38,8 @@ def main() -> None:
         assert len(loaded.faces) == len(mesh.faces)
         assert loaded.albedo is not None and loaded.albedo.size == image.size
         assert loaded.textured
+        assert loaded.native_maps["normal"].size == (32, 16)
+        assert loaded.native_maps["metallic_roughness"].size == (32, 16)
         assert loaded.extras["path"] == "worker/result.glb"
         assert loaded.extras["score"] == 0.5
         assert loaded_opts.target_polycount == 1234
