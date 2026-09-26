@@ -2,7 +2,8 @@
 
 The fast option: a single feed-forward pass (~seconds on an RTX 3060, ~6GB
 VRAM). Lower fidelity than TRELLIS/Hunyuan but great for quick blockout
-assets. Install from the TripoSR repo (exposes the ``tsr`` package).
+assets. On the RTX 3060 AssetForge profile this adapter defaults to a
+short-lived subprocess so its CUDA context is fully released after generation.
 """
 from __future__ import annotations
 
@@ -13,6 +14,11 @@ import numpy as np
 import trimesh
 from PIL import Image
 
+from ...workers.launch import (
+    isolated_workers_enabled,
+    probe_worker,
+    run_triposr_worker,
+)
 from ..base import (
     GenOptions,
     ImageTo3DAdapter,
@@ -64,6 +70,9 @@ class TripoSRImageTo3D(ImageTo3DAdapter):
         self._model = None
 
     def probe(self) -> tuple[bool, str]:
+        if isolated_workers_enabled():
+            return probe_worker("triposr")
+
         ok, reason = _torch_cuda_probe()
         if not ok:
             return False, reason
@@ -97,6 +106,9 @@ class TripoSRImageTo3D(ImageTo3DAdapter):
     def generate(
         self, images: Sequence[Image.Image], opts: GenOptions, progress: ProgressFn
     ) -> MeshResult:
+        if isolated_workers_enabled():
+            return run_triposr_worker(images, opts, progress)
+
         import torch
 
         model = self._load(progress)
