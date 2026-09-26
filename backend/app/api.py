@@ -94,7 +94,7 @@ def create_text_to_3d(req: TextTo3DRequest) -> dict:
     def work(job, progress_cb, cancelled):
         return runner.run_text_to_3d(
             prompt, opts, progress_cb, cancelled,
-            asset_created=lambda asset_id: setattr(job, "asset_id", asset_id),
+            asset_created=lambda asset_id: get_job_manager().link_asset(job.id, asset_id),
         )
 
     job = get_job_manager().submit("text_to_3d", {"prompt": prompt, **opts.__dict__}, work)
