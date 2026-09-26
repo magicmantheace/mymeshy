@@ -54,6 +54,8 @@ def _paint_available() -> tuple[bool, str]:
     """In-process paint availability check."""
     if importlib.util.find_spec("custom_rasterizer") is None:
         return False, "custom_rasterizer not compiled (needs CUDA toolkit; see README)"
+    if importlib.util.find_spec("mesh_processor") is None:
+        return False, "mesh_processor not compiled (needs C++ build tools; see README)"
     if low_vram():
         return False, "paint pipeline does not fit the configured VRAM budget (needs ~10-12GB)"
     return True, ""
