@@ -21,7 +21,7 @@ import trimesh
 from PIL import Image
 
 from .. import store
-from . import checkpoint, meshproc, pbr, registry
+from . import checkpoint, meshproc, pbr, registry, validation
 from .base import GenOptions, MeshResult, should_unload_between_stages
 
 log = logging.getLogger("mymeshy.pipeline")
@@ -248,7 +248,9 @@ def postprocess_to_asset(
         "has_uv": True,
     }
     meta["textures"] = textures
-    rep(1.0, "Asset exported")
+    rep(0.8, "Validating finished asset")
+    meta["validation"] = validation.validate_finished_asset(mesh, asset_path, textures)
+    rep(1.0, "Asset exported and validated")
     return store.write_meta(asset_id, meta)
 
 
