@@ -21,7 +21,7 @@ import trimesh
 from PIL import Image
 
 from .. import store
-from . import meshproc, pbr, registry
+from . import checkpoint, meshproc, pbr, registry
 from .base import GenOptions, MeshResult, should_unload_between_stages
 
 log = logging.getLogger("mymeshy.pipeline")
@@ -291,6 +291,7 @@ def run_text_to_3d(
         "source": {"type": "text", "prompt": prompt},
         "adapter": i23d.name,
     }
+    checkpoint.save_generation_checkpoint(asset_path, result, opts, meta)
     return postprocess_to_asset(result, opts, reporter, asset_id, asset_path, meta,
                                 keep_source_uvs=False, fallback_image=ref_image)
 
@@ -330,6 +331,7 @@ def run_image_to_3d(
         "source": {"type": "image", "image_names": [p.name for p in image_paths]},
         "adapter": i23d.name,
     }
+    checkpoint.save_generation_checkpoint(asset_path, result, opts, meta)
     return postprocess_to_asset(result, opts, reporter, asset_id, asset_path, meta,
                                 keep_source_uvs=False, fallback_image=images[0])
 
