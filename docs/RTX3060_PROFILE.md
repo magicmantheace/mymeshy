@@ -22,7 +22,7 @@ That profile currently:
 4. Uses TripoSR extraction resolution 224 instead of generic 256 or <=8GB 192.
 5. Changes `auto` image-to-3D preference to Hunyuan3D -> TripoSR -> legacy TRELLIS -> mock.
 
-Legacy TRELLIS remains available when explicitly requested. It is intentionally not the automatic first choice for this hardware profile because the current in-process TRELLIS adapter is not designed around 12GB operation. A separate TRELLIS.2 low-VRAM worker is planned.
+Legacy TRELLIS remains available when explicitly requested. It is intentionally not the automatic first choice for this hardware profile because the current in-process TRELLIS adapter is not designed around 12GB operation. Official TRELLIS.2 is also not promoted on this profile: upstream currently documents Linux-only testing and a 24GB minimum. See `TRELLIS2_RTX3060.md` for the evidence gate.
 
 ## Important distinction: scheduling vs hard cap
 
@@ -49,12 +49,15 @@ Implemented for the RTX 3060 reference profile:
 - structured real-model/hardware benchmark reports with source revisions
 - one-shot TripoSR CUDA-OOM fallback to the 192 / 2048 low-memory preset
 - finished-asset structural validation before jobs are marked successful
+- native albedo/UV plus normal, metallic-roughness, and occlusion preservation when adapters supply them
+- user-facing Fast / Balanced / Quality workload presets that stay within the currently supported adapter set
+- failed-job discovery and UI retry for generation checkpoints
+- Windows isolated-worker setup that persists its worker paths into `.env`
 
 Still requires repository work or physical validation:
 
 - benchmark Hunyuan Shape/Paint and TripoSR on the target RTX 3060 and tune from evidence
 - add a validated TRELLIS.2 quality worker if upstream/runtime testing proves 12GB practical
-- preserve full native PBR material channels where adapters provide them; current native preservation is primarily UV + albedo
 - add deeper Blender geometry/material QA where it catches issues the deterministic validator cannot
 - isolate SDXL concept generation only if measurements show process isolation materially helps
 
