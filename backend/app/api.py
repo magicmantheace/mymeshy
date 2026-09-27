@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from . import __version__, export, store
 from .config import detect_blender, detect_gpu, get_settings
 from .jobs import get_job_manager
-from .pipeline import registry, runner
+from .pipeline import checkpoint, registry, runner
 from .pipeline.base import GenOptions, runtime_vram_policy
 from .workers.launch import worker_policy_summary
 
@@ -181,8 +181,8 @@ def get_job(job_id: str) -> dict:
 def resume_asset(asset_id: str) -> dict:
     """Retry post-processing without rerunning the expensive generation model."""
     asset_path = store.asset_dir(asset_id)
-    if not (asset_path / "generation_checkpoint.json").is_file():
-        raise HTTPException(404, "generation checkpoint not found for asset")
+    if not checkpoint.has_generation_checkpoint(asset_path):
+        raise HTTPException(404, "generation checkpoint is incomplete or missing for asset")
 
     def work(job, progress_cb, cancelled):
         return runner.resume_postprocess(asset_id, progress_cb, cancelled)
