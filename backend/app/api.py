@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from . import __version__, export, store
-from .config import detect_blender, detect_gpu, get_settings
+from .config import detect_blender, detect_gpu, get_settings, runtime_versions
 from .jobs import get_job_manager
 from .pipeline import checkpoint, presets, registry, runner
 from .pipeline.base import GenOptions, runtime_vram_policy
@@ -74,6 +74,7 @@ def system_info() -> dict:
                       ("image_to_3d", "text_to_image", "texturing")}
     return {
         "version": __version__,
+        "runtime": runtime_versions(),
         "gpu": detect_gpu(),
         "memory_policy": runtime_vram_policy(),
         "workers": worker_policy_summary(),
