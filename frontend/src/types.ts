@@ -1,7 +1,7 @@
 // ---- Backend API contract -------------------------------------------------
 
 export type JobStatus = 'queued' | 'running' | 'done' | 'error' | 'cancelled';
-export type JobType = 'text_to_3d' | 'image_to_3d' | 'texture';
+export type JobType = 'text_to_3d' | 'image_to_3d' | 'texture' | 'resume_postprocess';
 
 export interface JobRecord {
   id: string;
@@ -12,6 +12,7 @@ export interface JobRecord {
   message?: string;
   error?: string;
   asset_id?: string;
+  resumable?: boolean;
   created_at: string;
   params: Record<string, unknown>;
 }

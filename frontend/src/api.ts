@@ -69,6 +69,8 @@ export const api = {
   getJob: (id: string) => request<JobRecord>(`/jobs/${id}`),
   cancelJob: (id: string) =>
     request<JobRecord>(`/jobs/${id}/cancel`, { method: 'POST' }),
+  resumeAsset: (assetId: string) =>
+    request<JobRecord>(`/assets/${assetId}/resume`, { method: 'POST' }),
 
   createTextTo3d: (prompt: string, options: GenOptions) =>
     request<JobRecord>(

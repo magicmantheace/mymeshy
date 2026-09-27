@@ -31,7 +31,16 @@ class Job:
     created_at: str = field(default_factory=lambda: time.strftime("%Y-%m-%dT%H:%M:%S"))
 
     def public(self) -> dict:
-        return asdict(self)
+        data = asdict(self)
+        data["resumable"] = False
+        if self.asset_id and self.status in ("error", "cancelled"):
+            try:
+                from .pipeline.checkpoint import has_generation_checkpoint
+                from .store import asset_dir
+                data["resumable"] = has_generation_checkpoint(asset_dir(self.asset_id))
+            except (OSError, ValueError):
+                pass
+        return data
 
 
 class JobManager:
@@ -63,7 +72,9 @@ class JobManager:
 
     def _save(self) -> None:
         with self._lock:
-            data = [self._jobs[i].public() for i in self._order[-200:]]
+            jobs = [self._jobs[i] for i in self._order[-200:]]
+        # public() may inspect checkpoint files; do that outside the manager lock.
+        data = [job.public() for job in jobs]
         try:
             get_settings().jobs_file.write_text(json.dumps(data, indent=1), encoding="utf-8")
         except OSError as exc:

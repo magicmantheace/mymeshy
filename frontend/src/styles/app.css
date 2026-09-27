@@ -1460,3 +1460,20 @@ select.input {
   background:
     conic-gradient(#1a202c 25%, #141923 0 50%, #1a202c 0 75%, #141923 0) 0 0 / 18px 18px;
 }
+
+
+.job__resume {
+  margin-top: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border, #3b4554);
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.job__resume:hover {
+  background: rgba(255, 255, 255, 0.06);
+}

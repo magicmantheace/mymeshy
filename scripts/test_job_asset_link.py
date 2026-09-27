@@ -29,6 +29,12 @@ def main() -> None:
         manager = JobManager()
         job = manager.submit("text_to_3d", {}, work)
         manager.link_asset(job.id, "resumable-asset")
+        asset_path = Path(td) / "assets" / "resumable-asset"
+        (asset_path / "source").mkdir(parents=True)
+        (asset_path / "generation_checkpoint.json").write_text("{}", encoding="utf-8")
+        (asset_path / "source" / "generated_raw.glb").write_bytes(b"checkpoint")
+        job.status = "error"
+        assert job.public()["resumable"] is True
 
         saved = json.loads((Path(td) / "jobs.json").read_text(encoding="utf-8"))
         record = next(item for item in saved if item["id"] == job.id)
