@@ -73,7 +73,7 @@ function JobItem({ job }: { job: JobRecord }) {
           <div className="job__error" title={job.error}>
             {job.error ?? 'Unknown error'}
           </div>
-          {job.resumable && job.asset_id && job.type !== 'resume_postprocess' && (
+          {job.resumable && job.asset_id && (
             <button
               className="job__resume"
               title="Retry cleanup, materials, and export from the saved generation checkpoint"
