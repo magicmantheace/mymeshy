@@ -34,7 +34,7 @@ function Set-EnvValue([string]$File, [string]$Key, [string]$Value) {
         } else { $existing }
     }
     if (-not $found) { $updated += $line }
-    Set-Content -Path $File -Value $updated -Encoding UTF8
+    [System.IO.File]::WriteAllLines($File, [string[]]$updated, [System.Text.UTF8Encoding]::new($false))
 }
 
 function Sync-ShallowRepo([string]$Url, [string]$Path, [string]$Name) {
