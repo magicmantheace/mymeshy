@@ -108,6 +108,20 @@ MYMESHY_BLENDER_PATH=C:\...\blender.exe   # only if auto-detection misses it
 MYMESHY_VRAM_BUDGET_GB=6         # hard cap on GPU memory (0 = unlimited)
 ```
 
+### Generation presets
+
+The generation UI exposes three explicit workload presets for the RTX 3060-class
+path. They are settings bundles, not benchmark claims:
+
+- **Fast:** TripoSR, 20k target triangles, 1024 px textures.
+- **Balanced:** hardware-aware Auto, 30k target triangles, 1024 px textures.
+- **Quality:** Hunyuan3D, 50k target triangles, 2048 px textures.
+
+Fast or Quality is disabled when its required adapter is unavailable. Balanced
+remains the default and follows the backend's hardware-aware adapter order.
+Official TRELLIS.2 is deliberately not attached to Quality until the RTX 3060
+promotion gate in `docs/TRELLIS2_RTX3060.md` is satisfied.
+
 ### VRAM budget
 
 `MYMESHY_VRAM_BUDGET_GB` hard-caps torch allocations to that amount. Budgets
