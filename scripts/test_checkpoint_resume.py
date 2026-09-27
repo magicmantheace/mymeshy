@@ -35,7 +35,7 @@ def main() -> None:
         save_generation_checkpoint(root, result, opts, {"name": "checkpoint test"})
 
         loaded, loaded_opts, meta = load_generation_checkpoint(root)
-        assert len(loaded.faces) == len(mesh.faces)
+        assert len(loaded.mesh.faces) == len(mesh.faces)
         assert loaded.albedo is not None and loaded.albedo.size == image.size
         assert loaded.textured
         assert loaded.native_maps["normal"].size == (32, 16)
