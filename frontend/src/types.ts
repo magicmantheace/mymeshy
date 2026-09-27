@@ -39,6 +39,11 @@ export interface AssetMeta {
   };
   textures: TextureMap[];
   adapter: string;
+  pipeline_adapters?: {
+    text_to_image?: string;
+    image_to_3d?: string;
+    texturing?: string;
+  };
 }
 
 export interface AdapterInfo {
