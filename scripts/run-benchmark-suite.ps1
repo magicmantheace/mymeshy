@@ -10,7 +10,7 @@ if (-not (Test-Path $python)) {
     exit 1
 }
 
-$suitePath = Join-Path $root $Suite
+$suitePath = if ([System.IO.Path]::IsPathRooted($Suite)) { $Suite } else { Join-Path $root $Suite }
 if (-not (Test-Path $suitePath)) {
     Write-Host "Benchmark suite not found: $suitePath" -ForegroundColor Red
     exit 1
@@ -22,8 +22,8 @@ New-Item -ItemType Directory -Force $runDir | Out-Null
 
 Write-Host ">> Capturing hardware/system state" -ForegroundColor Cyan
 & (Join-Path $root "scripts\validate-hardware.ps1") -Output (Join-Path $runDir "hardware.json")
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Hardware validation command returned $LASTEXITCODE; continuing so the report is preserved." -ForegroundColor Yellow
+if (-not $?) {
+    Write-Host "Hardware validation command reported a problem; continuing so available evidence is preserved." -ForegroundColor Yellow
 }
 
 $failures = 0
