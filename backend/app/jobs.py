@@ -156,6 +156,7 @@ class JobManager:
                     log.error("Job %s failed:\n%s", job.id, traceback.format_exc())
                     job.status = "error"
                     job.error = f"{type(exc).__name__}: {exc}"
+                    job.error_category = getattr(exc, "category", None)
                     job.message = "Failed"
             finally:
                 self._save()
