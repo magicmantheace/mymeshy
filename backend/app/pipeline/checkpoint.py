@@ -27,7 +27,10 @@ def _json_safe(value):
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     if isinstance(value, Path):
-        return str(value)
+        # Provenance paths are metadata rather than host-native filesystem APIs.
+        # Store a stable representation so Windows and Linux checkpoints compare
+        # identically and benchmark reports do not drift only because of `\\`.
+        return value.as_posix()
     if isinstance(value, np.generic):
         return value.item()
     if isinstance(value, dict):
