@@ -20,7 +20,7 @@ log = logging.getLogger("mymeshy.jobs")
 @dataclass
 class Job:
     id: str
-    type: str  # text_to_3d | image_to_3d | texture
+    type: str  # text_to_3d | image_to_3d | texture | resume_postprocess
     params: dict
     status: str = "queued"  # queued | running | done | error | cancelled
     stage: str = ""
@@ -38,6 +38,7 @@ class Job:
             try:
                 from .pipeline.checkpoint import has_generation_checkpoint
                 from .store import asset_dir
+
                 data["resumable"] = has_generation_checkpoint(asset_dir(self.asset_id))
             except (OSError, ValueError):
                 pass
@@ -60,16 +61,29 @@ class JobManager:
         p = get_settings().jobs_file
         if not p.is_file():
             return
+        normalized_restart = False
         try:
             for d in json.loads(p.read_text(encoding="utf-8")):
-                if d.get("status") in ("queued", "running"):
+                previous_status = d.get("status")
+                if previous_status in ("queued", "running"):
                     d["status"] = "error"
-                    d["error"] = "Backend restarted while the job was running"
+                    d["error"] = f"Backend restarted while the job was {previous_status}"
+                    d["error_category"] = "backend_restart"
+                    d["stage"] = "interrupted"
+                    d["message"] = "Interrupted by backend restart"
+                    normalized_restart = True
                 job = Job(**{k: v for k, v in d.items() if k in Job.__dataclass_fields__})
                 self._jobs[job.id] = job
                 self._order.append(job.id)
         except (json.JSONDecodeError, TypeError) as exc:
             log.warning("Could not load job history: %s", exc)
+            return
+
+        # Write the normalized terminal state back immediately. Without this,
+        # jobs.json can continue claiming an interrupted job is running across
+        # every subsequent restart even though the in-memory record is an error.
+        if normalized_restart:
+            self._save()
 
     def _save(self) -> None:
         with self._lock:
