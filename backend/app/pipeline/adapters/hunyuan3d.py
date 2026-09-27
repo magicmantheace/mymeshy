@@ -40,6 +40,11 @@ SHAPE_SUBFOLDER = os.environ.get(
     _SHAPE_SUBFOLDERS.get(SHAPE_MODEL.split("/")[-1], "hunyuan3d-dit-v2-0"),
 )
 
+# Failures that mean Paint could not run reliably on the current machine but do
+# not invalidate the already-completed Shape output. Protocol/output corruption
+# and generic worker bugs intentionally remain hard failures.
+_SALVAGEABLE_PAINT_FAILURES = {"cuda_oom", "timeout", "dependency", "configuration"}
+
 
 def _hy3dgen_probe() -> tuple[bool, str]:
     ok, reason = _torch_cuda_probe()
@@ -154,12 +159,17 @@ class Hunyuan3DImageTo3D(ImageTo3DAdapter):
                     lambda p, m: progress(0.58 + p * 0.42, m),
                 )
             except WorkerFailure as exc:
+                if exc.category not in _SALVAGEABLE_PAINT_FAILURES:
+                    raise
                 shape.extras["paint_fallback"] = {
                     "worker": exc.worker,
                     "category": exc.category,
                     "error": str(exc),
                 }
-                progress(1.0, f"Shape ready (paint failed: {exc.category}; using reference projection)")
+                progress(
+                    1.0,
+                    f"Shape ready (paint failed: {exc.category}; using reference projection)",
+                )
                 return shape
 
             painted.extras["shape_worker_pid"] = shape.extras.get("worker_pid")
@@ -232,7 +242,7 @@ class HunyuanPaintTexturing(TexturingAdapter):
 
     def probe(self) -> tuple[bool, str]:
         if low_vram():
-            return False, "paint pipeline does not fit the configured VRAM budget (needs ~10-12GB)"
+            return False, "paint pipeline does not fit the configured <=8GB VRAM budget"
         if _isolated_enabled():
             from ...workers.launch import probe_worker
 
