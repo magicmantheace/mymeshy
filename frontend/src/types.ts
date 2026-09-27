@@ -93,6 +93,7 @@ export interface GenOptions {
   texture_size?: number;
   generate_pbr?: boolean;
   seed?: number;
+  decimate?: boolean;
 }
 
 export type ExportFormat = 'glb' | 'gltf' | 'obj' | 'fbx';
