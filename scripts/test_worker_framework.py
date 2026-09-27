@@ -19,6 +19,8 @@ sys.path.insert(0, str(BACKEND))
 from app.workers.launch import (  # noqa: E402
     _WORKER_MODULES,
     _is_cuda_oom,
+    classify_worker_failure,
+    WorkerFailure,
     _worker_env,
     worker_policy_summary,
 )
@@ -30,6 +32,16 @@ def main() -> None:
     assert _is_cuda_oom("CUBLAS_STATUS_ALLOC_FAILED when calling cublasCreate")
     assert not _is_cuda_oom("worker timed out after 900 seconds")
     assert not _is_cuda_oom("No module named xformers")
+    assert classify_worker_failure("CUDA out of memory") == "cuda_oom"
+    assert classify_worker_failure("worker exceeded the 30s timeout and was terminated") == "timeout"
+    assert classify_worker_failure("ModuleNotFoundError: No module named xformers") == "dependency"
+    assert classify_worker_failure("worker Python does not exist: missing.exe") == "configuration"
+    assert classify_worker_failure("worker exited without writing result.json") == "missing_result"
+    assert classify_worker_failure("malformed result.json: JSONDecodeError") == "malformed_result"
+    assert classify_worker_failure("process exited 7") == "worker_error"
+    failure = WorkerFailure("triposr", "CUDA out of memory")
+    assert failure.category == "cuda_oom"
+    assert failure.worker == "triposr"
 
     expected = {"triposr", "hunyuan_shape", "hunyuan_paint"}
     missing = expected.difference(_WORKER_MODULES)
