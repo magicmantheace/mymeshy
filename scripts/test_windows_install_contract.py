@@ -26,6 +26,9 @@ def main() -> None:
     assert "git -C $Path fetch --depth 1 origin $Revision" in WORKERS
     assert "git -C $Path checkout --detach --force FETCH_HEAD" in WORKERS
     assert 'Set-EnvValue $envFile "MYMESHY_ISOLATED_WORKERS" "true"' in WORKERS
+    # Keep the result array-shaped even when a fresh .env has zero or one line;
+    # otherwise PowerShell's += concatenates subsequent settings into one line.
+    assert "$updated = @(foreach ($existing in $lines)" in WORKERS
     assert "MYMESHY_TRIPOSR_WORKER_PYTHON" in WORKERS
     assert "MYMESHY_HUNYUAN_SHAPE_WORKER_PYTHON" in WORKERS
 

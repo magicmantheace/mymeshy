@@ -35,12 +35,12 @@ function Set-EnvValue([string]$File, [string]$Key, [string]$Value) {
     $lines = if (Test-Path $File) { @(Get-Content $File) } else { @() }
     $pattern = "^\s*" + [regex]::Escape($Key) + "\s*="
     $found = $false
-    $updated = foreach ($existing in $lines) {
+    $updated = @(foreach ($existing in $lines) {
         if ($existing -match $pattern) {
             if (-not $found) { $line }
             $found = $true
         } else { $existing }
-    }
+    })
     if (-not $found) { $updated += $line }
     [System.IO.File]::WriteAllLines($File, [string[]]$updated, [System.Text.UTF8Encoding]::new($false))
 }

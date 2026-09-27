@@ -34,8 +34,10 @@ Check "Backend venv" (Test-Path $python) $python ".\scripts\setup.ps1"
 
 $nvidia = Get-Command nvidia-smi -ErrorAction SilentlyContinue
 if ($nvidia) {
-    $gpu = (& nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader,nounits 2>$null | Select-Object -First 1)
-    Check "NVIDIA driver" ($LASTEXITCODE -eq 0 -and [bool]$gpu) $gpu "Install/update the NVIDIA driver."
+    $gpuRows = @(& nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader,nounits 2>$null)
+    $nvidiaExitCode = $LASTEXITCODE
+    $gpu = $gpuRows | Select-Object -First 1
+    Check "NVIDIA driver" ($nvidiaExitCode -eq 0 -and [bool]$gpu) $gpu "Install/update the NVIDIA driver."
 } else {
     Check "NVIDIA driver" $false "nvidia-smi not found" "Install an NVIDIA driver before real-model generation."
 }
