@@ -33,6 +33,7 @@ interface AppState {
   fetchAssets: () => Promise<void>;
   selectAsset: (id: string | null) => void;
   cancelJob: (id: string) => Promise<void>;
+  resumeAsset: (assetId: string) => Promise<void>;
   deleteAsset: (id: string) => Promise<void>;
   renameAsset: (id: string, name: string) => Promise<void>;
   setShading: (mode: ShadingMode) => void;
@@ -123,6 +124,11 @@ export const useStore = create<AppState>((set, get) => ({
     } catch {
       /* refresh will reconcile */
     }
+    await get().fetchJobs();
+  },
+
+  resumeAsset: async (assetId) => {
+    await api.resumeAsset(assetId);
     await get().fetchJobs();
   },
 
