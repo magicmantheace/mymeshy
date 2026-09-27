@@ -26,6 +26,12 @@ if (-not $?) {
     Write-Host "Hardware validation command reported a problem; continuing so available evidence is preserved." -ForegroundColor Yellow
 }
 
+Write-Host ">> Capturing isolated worker runtime versions" -ForegroundColor Cyan
+& $python (Join-Path $root "scripts\worker-runtime-info.py") --output (Join-Path $runDir "worker-runtimes.json")
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Worker runtime provenance failed; continuing so benchmark failures can still be recorded." -ForegroundColor Yellow
+}
+
 $failures = 0
 foreach ($adapter in $config.adapters) {
     foreach ($caseId in $config.cases) {
