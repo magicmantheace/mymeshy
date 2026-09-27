@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "description": "Small deterministic pre-tuning corpus. Keep case IDs and inputs stable so RTX 3060 runs remain comparable.",
+  "cases": [
+    {
+      "id": "text_crate",
+      "mode": "text",
+      "prompt": "a simple wooden shipping crate with metal corner brackets"
+    },
+    {
+      "id": "text_stool",
+      "mode": "text",
+      "prompt": "a three-legged round wooden workshop stool"
+    },
+    {
+      "id": "text_lantern",
+      "mode": "text",
+      "prompt": "a compact camping lantern with a metal handle and glass chamber"
+    },
+    {
+      "id": "image_potion",
+      "mode": "image",
+      "generator": "potion"
+    },
+    {
+      "id": "image_chair",
+      "mode": "image",
+      "generator": "chair"
+    },
+    {
+      "id": "image_lamp",
+      "mode": "image",
+      "generator": "lamp"
+    }
+  ]
+}

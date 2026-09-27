@@ -1,6 +1,6 @@
 """Direct pipeline test for the real (GPU) adapters, with VRAM monitoring.
 
-    python scripts/real_model_test.py triposr|hunyuan3d [image|text]
+    python scripts/real_model_test.py triposr|hunyuan3d [case_id]\n\nCase IDs are defined in benchmarks/corpus.json. If omitted, image_potion is used.
 
 Peaks above the configured budget mean offloading isn't holding.
 """
@@ -55,11 +55,43 @@ def monitor():
         time.sleep(1)
 
 
+def _load_case(case_id: str) -> dict:
+    corpus_path = Path("benchmarks/corpus.json")
+    corpus = json.loads(corpus_path.read_text(encoding="utf-8"))
+    for case in corpus["cases"]:
+        if case["id"] == case_id:
+            return case
+    known = ", ".join(case["id"] for case in corpus["cases"])
+    raise ValueError(f"unknown benchmark case {case_id!r}; choose one of: {known}")
+
+
+def _synthetic_image(generator: str):
+    from PIL import Image, ImageDraw
+    img = Image.new("RGBA", (512, 512), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    if generator == "potion":
+        d.rounded_rectangle([196, 60, 316, 150], radius=20, fill=(160, 120, 70, 255))
+        d.ellipse([130, 130, 382, 430], fill=(90, 40, 130, 255))
+        d.ellipse([180, 180, 280, 280], fill=(140, 80, 190, 255))
+    elif generator == "chair":
+        d.rectangle([155, 210, 357, 290], fill=(130, 90, 55, 255))
+        d.rectangle([165, 80, 347, 220], fill=(145, 100, 60, 255))
+        d.rectangle([170, 285, 205, 455], fill=(110, 75, 45, 255))
+        d.rectangle([307, 285, 342, 455], fill=(110, 75, 45, 255))
+    elif generator == "lamp":
+        d.polygon([(256, 70), (150, 250), (362, 250)], fill=(210, 180, 90, 255))
+        d.rectangle([238, 250, 274, 410], fill=(90, 90, 90, 255))
+        d.ellipse([170, 390, 342, 455], fill=(80, 80, 80, 255))
+    else:
+        raise ValueError(f"unknown synthetic image generator: {generator}")
+    return img
+
+
 def main():
     adapter = sys.argv[1] if len(sys.argv) > 1 else "triposr"
-    mode = sys.argv[2] if len(sys.argv) > 2 else "image"
-
-    from PIL import Image, ImageDraw
+    case_id = sys.argv[2] if len(sys.argv) > 2 else "image_potion"
+    case = _load_case(case_id)
+    mode = case["mode"]
 
     from app.pipeline.base import GenOptions
     from app.pipeline.runner import run_image_to_3d, run_text_to_3d
@@ -86,15 +118,10 @@ def main():
 
     try:
         if mode == "text":
-            meta = run_text_to_3d("a wooden treasure chest with brass fittings", opts, cb, lambda: False)
+            meta = run_text_to_3d(case["prompt"], opts, cb, lambda: False)
         else:
-            # synthetic test subject: a simple potion-bottle silhouette
-            img = Image.new("RGBA", (512, 512), (0, 0, 0, 0))
-            d = ImageDraw.Draw(img)
-            d.rounded_rectangle([196, 60, 316, 150], radius=20, fill=(160, 120, 70, 255))
-            d.ellipse([130, 130, 382, 430], fill=(90, 40, 130, 255))
-            d.ellipse([180, 180, 280, 280], fill=(140, 80, 190, 255))
-            p = settings.uploads_dir / "test_potion.png"
+            img = _synthetic_image(case["generator"])
+            p = settings.uploads_dir / f"benchmark_{case_id}.png"
             img.save(p)
             meta = run_image_to_3d([p], opts, cb, lambda: False)
         status = "passed"
@@ -110,6 +137,8 @@ def main():
             "status": status,
             "error": error,
             "adapter": adapter,
+            "case_id": case_id,
+            "case": case,
             "mode": mode,
             "source_revisions": {
                 "assetforge": _git_revision(Path(".")),
@@ -130,11 +159,12 @@ def main():
             "asset_id": meta.get("id") if meta else None,
             "stats": meta.get("stats") if meta else None,
             "textures": meta.get("textures") if meta else None,
+            "validation": meta.get("validation") if meta else None,
         }
         out_dir = settings.data_dir / "benchmarks"
         out_dir.mkdir(parents=True, exist_ok=True)
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        out = out_dir / f"real-model-{adapter}-{mode}-{stamp}.json"
+        out = out_dir / f"real-model-{adapter}-{case_id}-{stamp}.json"
         out.write_text(json.dumps(report, indent=2), encoding="utf-8")
         print(f"\nBenchmark report: {out}")
         print(f"Runtime: {elapsed:.0f}s | peak GPU: {peak['used']} MiB total, ~{ours} MiB delta")
