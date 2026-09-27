@@ -187,15 +187,23 @@ def main() -> None:
         elapsed = now - t0
         ours = max(0, peak["used"] - peak["baseline"])
         generation_meta = (meta.get("generation") or {}) if meta else {}
+        adapter_extras = generation_meta.get("adapter_extras")
+        degradation = None
+        if isinstance(adapter_extras, dict):
+            candidate = adapter_extras.get("paint_fallback") or adapter_extras.get("paint_skipped")
+            if isinstance(candidate, dict):
+                degradation = candidate
         report = {
-            "schema_version": 2,
+            "schema_version": 3,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "status": status,
+            "degraded": degradation is not None,
+            "degradation": degradation,
             "error": error,
             "error_category": error_category,
             "adapter": args.adapter,
             "pipeline_adapters": meta.get("pipeline_adapters") if meta else None,
-            "adapter_extras": generation_meta.get("adapter_extras"),
+            "adapter_extras": adapter_extras,
             "case_id": args.case_id,
             "corpus_version": corpus_version,
             "case_fingerprint": _case_fingerprint(case),
@@ -235,6 +243,8 @@ def main() -> None:
         out.write_text(json.dumps(report, indent=2), encoding="utf-8")
         print(f"\nBenchmark report: {out}")
         print(f"Runtime: {elapsed:.0f}s | peak GPU: {peak['used']} MiB total, ~{ours} MiB delta")
+        if degradation:
+            print(f"Degraded: {degradation.get('category', 'unknown')} — {degradation}")
         if meta:
             print(f"Asset: {meta['id']} | stats: {meta['stats']} | textures: {meta['textures']}")
 

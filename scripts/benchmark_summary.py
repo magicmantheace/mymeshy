@@ -7,6 +7,14 @@ import json
 from pathlib import Path
 
 
+def _degradation(report: dict, adapter_extras: dict) -> dict | None:
+    explicit = report.get("degradation")
+    if isinstance(explicit, dict):
+        return explicit
+    fallback = adapter_extras.get("paint_fallback") or adapter_extras.get("paint_skipped")
+    return fallback if isinstance(fallback, dict) else None
+
+
 def _row(report: dict, source: Path) -> dict:
     stats = report.get("stats") or {}
     validation = report.get("validation") or {}
@@ -14,9 +22,10 @@ def _row(report: dict, source: Path) -> dict:
     settings = report.get("settings") or {}
     pipeline_adapters = report.get("pipeline_adapters") or {}
     adapter_extras = report.get("adapter_extras") or {}
-    degradation = adapter_extras.get("paint_fallback") or adapter_extras.get("paint_skipped")
-    if not isinstance(degradation, dict):
-        degradation = None
+    if not isinstance(adapter_extras, dict):
+        adapter_extras = {}
+    degradation = _degradation(report, adapter_extras)
+    degraded = bool(report.get("degraded")) or degradation is not None
     return {
         "file": source.name,
         "timestamp": report.get("timestamp"),
@@ -26,7 +35,7 @@ def _row(report: dict, source: Path) -> dict:
         "texturing_adapter": pipeline_adapters.get("texturing"),
         "case_id": report.get("case_id"),
         "status": report.get("status"),
-        "degraded": degradation is not None,
+        "degraded": degraded,
         "degradation_category": degradation.get("category") if degradation else None,
         "error_category": report.get("error_category"),
         "runtime_seconds": report.get("runtime_seconds"),
@@ -52,14 +61,18 @@ def summarize_reports(paths: list[Path]) -> dict:
             malformed.append({"file": path.name, "error": str(exc)})
 
     passed = sum(row["status"] == "passed" for row in rows)
+    degraded_passed = sum(
+        row["status"] == "passed" and bool(row["degraded"]) for row in rows
+    )
+    clean_passed = passed - degraded_passed
     failed = sum(row["status"] != "passed" for row in rows)
-    degraded = sum(bool(row["degraded"]) for row in rows)
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "reports": len(rows),
         "passed": passed,
+        "clean_passed": clean_passed,
+        "degraded_passed": degraded_passed,
         "failed": failed,
-        "degraded": degraded,
         "malformed_reports": malformed,
         "rows": rows,
     }
@@ -94,8 +107,8 @@ def main() -> None:
     print(f"Benchmark summary: {json_path}")
     print(f"CSV summary: {csv_path}")
     print(
-        f"Reports: {summary['reports']} | passed: {summary['passed']} | "
-        f"failed: {summary['failed']} | degraded: {summary['degraded']}"
+        f"Reports: {summary['reports']} | clean passes: {summary['clean_passed']} | "
+        f"degraded passes: {summary['degraded_passed']} | failed: {summary['failed']}"
     )
     if summary["malformed_reports"]:
         print(f"Malformed reports: {len(summary['malformed_reports'])}")
