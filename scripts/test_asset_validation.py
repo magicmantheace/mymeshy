@@ -28,6 +28,16 @@ def main() -> None:
         assert report["passed"]
         assert report["triangles"] == len(mesh.faces)
         assert report["texture_sizes"]["albedo"] == [32, 16]
+        assert report["exported_geometry"]["triangles"] > 0
+        assert report["exported_geometry"]["meshes"] >= 1
+
+        (root / "model.glb").write_bytes(b"not a glb but definitely longer than twenty bytes")
+        try:
+            validate_finished_asset(mesh, root, ["albedo"])
+        except ValueError as exc:
+            assert "could not be reloaded" in str(exc) or "no triangle geometry" in str(exc)
+        else:
+            raise AssertionError("corrupt GLB was not rejected")
 
         (root / "model.glb").unlink()
         try:
