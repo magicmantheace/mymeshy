@@ -79,11 +79,16 @@ This creates:
 .workers\hunyuan\
 ```
 
-The setup requires both `uv` and Git. It is safe to rerun: existing shallow
-TripoSR and Hunyuan3D-2 checkouts are fetched and reset to their current
-upstream default branch, while non-Git directories at those paths are rejected
-instead of silently reused. The script prints the exact source commit installed
-for each model so a benchmark can be tied to the code that produced it.
+The setup requires both `uv` and Git. It is safe to rerun. TripoSR and
+Hunyuan3D-2 are checked out at the exact revisions in
+`backend/model-sources.json`, not whatever upstream's default branch happens to
+contain at install time. Existing Git checkouts are reset to the locked revision,
+non-Git directories at those paths are rejected, and the installed SHA is
+verified after checkout.
+
+Updating a source lock is an explicit repository change. The lock itself is not a
+performance claim; after changing it, collect fresh target-hardware evidence
+before changing tuned defaults.
 
 The setup script writes the isolation flag and worker Python paths into `.env`
 automatically. Existing unrelated settings are preserved, and rerunning setup
@@ -113,7 +118,9 @@ That builds Hunyuan's `custom_rasterizer` and `differentiable_renderer` inside t
 - whether the required external model source checkout exists
 - a `configured` summary combining those static checks
 - lightweight worker runtime provenance: Python version, Torch version, Torch
-  CUDA runtime, CUDA visibility, and external source revision
+  CUDA runtime, CUDA visibility, and actual external source revision
+- the expected source revision from `backend/model-sources.json`
+- whether the actual source revision matches that lock
 
 The runtime provenance probe does **not** load generation model weights. It only
 starts the configured worker Python and imports Torch. Model/runtime availability
@@ -121,7 +128,9 @@ is still determined by each worker's dedicated `--probe` path and is exposed in
 the adapter availability section of `/api/system`.
 
 This distinction matters: a worker can have a valid Python/Torch/CUDA environment
-while a model-specific dependency or compiled extension is still missing.
+while a model-specific dependency or compiled extension is still missing. It can
+also be otherwise runnable while its source checkout has drifted from the
+benchmark lock; diagnostics report that separately.
 
 The same lightweight provenance can be written directly with:
 
