@@ -38,7 +38,7 @@ def main() -> None:
     assert classify_worker_failure("worker Python does not exist: missing.exe") == "configuration"
     assert classify_worker_failure("worker exited without writing result.json") == "missing_result"
     assert classify_worker_failure("malformed result.json: JSONDecodeError") == "malformed_result"
-    assert classify_worker_failure("process exited 7") == "worker_error"
+    assert classify_worker_failure("worker mesh is missing: mesh.glb") == "missing_result"\n    assert classify_worker_failure("worker produced an invalid triangle mesh") == "malformed_result"\n    assert classify_worker_failure("process exited 7") == "worker_error"
     failure = WorkerFailure("triposr", "CUDA out of memory")
     assert failure.category == "cuda_oom"
     assert failure.worker == "triposr"
