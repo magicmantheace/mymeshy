@@ -38,6 +38,8 @@ Each case has a fingerprint in its report so accidental input drift is visible.
 A run creates a timestamped directory under `data/benchmarks/` containing:
 
 - `hardware.json` — GPU, driver, `/api/system`, and source revisions
+- `worker-runtimes.json` — configured worker Python, Python/Torch/CUDA versions,
+  CUDA visibility, and external source revision for TripoSR and Hunyuan workers
 - one `real-model-<adapter>-<case>.json` report per matrix entry
 - `benchmark-summary.json`
 - `benchmark-summary.csv`
@@ -47,12 +49,17 @@ Individual model reports include:
 - exact corpus case and fingerprint
 - adapter and settings
 - source revisions
-- Python, Torch, and CUDA runtime provenance
+- backend Python, Torch, and CUDA runtime provenance
 - total runtime
 - per-stage timings
 - GPU baseline, total peak, and peak delta
 - structured failure category when available
 - finished-asset stats and validation result
+
+Worker-environment runtime versions are captured once per suite instead of once
+per case so the provenance probe does not add repeated setup overhead to the
+matrix. `/api/system` exposes the same worker runtime information when the
+backend is running.
 
 The suite continues after an individual model failure so OOMs, dependency
 failures, and malformed outputs are retained as evidence rather than aborting
@@ -70,6 +77,12 @@ Use explicit overrides only when intentionally testing a hypothesis:
 ```powershell
 .venv\Scripts\python.exe scripts\real_model_test.py triposr image_potion `
   --target-polycount 20000 --texture-size 1024 --seed 12345
+```
+
+To inspect isolated worker versions without running generation models:
+
+```powershell
+.venv\Scripts\python.exe scripts\worker-runtime-info.py
 ```
 
 ## Rebuild a summary
