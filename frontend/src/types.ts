@@ -46,10 +46,18 @@ export interface AdapterInfo {
   reason?: string;
 }
 
+export interface GenerationPreset {
+  name: 'fast' | 'balanced' | 'quality';
+  available: boolean;
+  required_adapter?: string | null;
+  settings: GenOptions;
+}
+
 export interface SystemInfo {
   version: string;
   gpu: { name: string; vram_mb: number } | null;
   blender: boolean;
+  generation_presets: GenerationPreset[];
   adapters: {
     image_to_3d: AdapterInfo[];
     text_to_image: AdapterInfo[];
@@ -66,6 +74,7 @@ export interface SystemInfo {
 // ---- Frontend-only types --------------------------------------------------
 
 export interface GenOptions {
+  preset?: 'fast' | 'balanced' | 'quality';
   adapter?: string;
   target_polycount?: number;
   texture_size?: number;
