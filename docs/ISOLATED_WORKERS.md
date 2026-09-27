@@ -85,7 +85,6 @@ upstream default branch, while non-Git directories at those paths are rejected
 instead of silently reused. The script prints the exact source commit installed
 for each model so a benchmark can be tied to the code that produced it.
 
-
 The setup script writes the isolation flag and worker Python paths into `.env`
 automatically. Existing unrelated settings are preserved, and rerunning setup
 updates each worker key in place instead of appending duplicates.
@@ -104,31 +103,43 @@ That builds Hunyuan's `custom_rasterizer` and `differentiable_renderer` inside t
 
 ## Runtime inspection
 
-`GET /api/system` now includes a `workers` object showing:
+`GET /api/system` includes a `workers` object showing:
 
 - whether isolation is enabled
 - worker timeout
-- Python executable for TripoSR
-- Python executable for Hunyuan Shape
-- Python executable for Hunyuan Paint
+- Python executable for TripoSR, Hunyuan Shape, and Hunyuan Paint
 - whether each executable is separate from the backend interpreter
 - whether the configured Python executable exists
 - whether the required external model source checkout exists
 - a `configured` summary combining those static checks
+- lightweight worker runtime provenance: Python version, Torch version, Torch
+  CUDA runtime, CUDA visibility, and external source revision
 
-These are configuration-readiness checks, not a claim that CUDA/model loading has
-already succeeded. Adapter availability in the same `/api/system` response
-performs the model-runtime probe. This distinction avoids presenting a worker as
-GPU-ready merely because a Python path was configured.
+The runtime provenance probe does **not** load generation model weights. It only
+starts the configured worker Python and imports Torch. Model/runtime availability
+is still determined by each worker's dedicated `--probe` path and is exposed in
+the adapter availability section of `/api/system`.
 
-This should be checked before GPU benchmarking.
+This distinction matters: a worker can have a valid Python/Torch/CUDA environment
+while a model-specific dependency or compiled extension is still missing.
+
+The same lightweight provenance can be written directly with:
+
+```powershell
+.venv\Scripts\python.exe scripts\worker-runtime-info.py
+```
+
+The Windows doctor uses this information before benchmarking and the benchmark
+suite stores it once per run in `worker-runtimes.json`.
 
 ## Tests
 
-The subprocess IPC contract can be verified without a GPU:
+The subprocess IPC and runtime-provenance contracts can be verified without
+loading generation models:
 
 ```powershell
 .venv\Scripts\python.exe scripts\test_worker_framework.py
+.venv\Scripts\python.exe scripts\test_worker_runtime_diagnostics.py
 ```
 
 A real RTX 3060 validation should then monitor `nvidia-smi` across these boundaries:
