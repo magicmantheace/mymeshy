@@ -19,6 +19,20 @@ def validate_finished_asset(mesh: trimesh.Trimesh, asset_path: Path, textures: l
     faces = np.asarray(mesh.faces)
     if faces.size and (faces.min() < 0 or faces.max() >= len(mesh.vertices)):
         errors.append("mesh contains out-of-range face indices")
+    areas = np.asarray(mesh.area_faces)
+    if areas.size and (not np.isfinite(areas).all() or (areas <= 1e-12).any()):
+        errors.append("mesh contains degenerate or non-finite triangle areas")
+    normals = np.asarray(mesh.face_normals)
+    if normals.size and not np.isfinite(normals).all():
+        errors.append("mesh contains non-finite face normals")
+    components = mesh.split(only_watertight=False)
+    if len(components) > 1:
+        warnings.append(f"mesh contains {len(components)} disconnected components")
+    if not mesh.is_watertight:
+        warnings.append("mesh is not watertight")
+    extents = np.asarray(mesh.bounding_box.extents)
+    if not np.isfinite(extents).all() or (extents <= 1e-9).any():
+        errors.append("mesh has a collapsed or invalid bounding box")
 
     uvs = getattr(getattr(mesh, "visual", None), "uv", None)
     if uvs is None:
@@ -59,6 +73,9 @@ def validate_finished_asset(mesh: trimesh.Trimesh, asset_path: Path, textures: l
         "warnings": warnings,
         "vertices": int(len(mesh.vertices)),
         "triangles": int(len(mesh.faces)),
+        "components": int(len(components)),
+        "watertight": bool(mesh.is_watertight),
+        "bounds_extents": [float(v) for v in extents],
         "texture_sizes": texture_sizes,
     }
     if errors:
