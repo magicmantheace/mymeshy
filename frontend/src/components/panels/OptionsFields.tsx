@@ -1,6 +1,7 @@
 import { useStore } from '../../store';
 
 export interface OptionsState {
+  preset: '' | 'fast' | 'balanced' | 'quality';
   adapter: string; // '' = auto (backend default)
   target_polycount: string;
   texture_size: number;
@@ -9,6 +10,7 @@ export interface OptionsState {
 }
 
 export const DEFAULT_OPTIONS: OptionsState = {
+  preset: 'balanced',
   adapter: '',
   target_polycount: '30000',
   texture_size: 1024,
@@ -16,18 +18,11 @@ export const DEFAULT_OPTIONS: OptionsState = {
   seed: '',
 };
 
-type PresetName = 'fast' | 'balanced' | 'quality';
-
-const GENERATION_PRESETS: Record<PresetName, Pick<OptionsState, 'adapter' | 'target_polycount' | 'texture_size' | 'generate_pbr'>> = {
-  fast: { adapter: 'triposr', target_polycount: '20000', texture_size: 1024, generate_pbr: true },
-  balanced: { adapter: '', target_polycount: '30000', texture_size: 1024, generate_pbr: true },
-  quality: { adapter: 'hunyuan3d', target_polycount: '50000', texture_size: 2048, generate_pbr: true },
-};
-
 export function optionsToPayload(o: OptionsState) {
   const polycount = parseInt(o.target_polycount, 10);
   const seed = parseInt(o.seed, 10);
   return {
+    preset: o.preset || undefined,
     adapter: o.adapter || undefined,
     target_polycount: Number.isFinite(polycount) && polycount > 0 ? polycount : undefined,
     texture_size: o.texture_size,
@@ -54,15 +49,20 @@ export function OptionsFields({
   const adapters = system?.adapters[adapterKind] ?? [];
 
   const patch = (p: Partial<OptionsState>) => onChange({ ...value, ...p });
-  const available = new Set(adapters.filter((a) => a.available).map((a) => a.name));
-  const applyPreset = (name: PresetName) => onChange({ ...value, ...GENERATION_PRESETS[name] });
-  const activePreset = (Object.keys(GENERATION_PRESETS) as PresetName[]).find((name) => {
-    const preset = GENERATION_PRESETS[name];
-    return value.adapter === preset.adapter
-      && value.target_polycount === preset.target_polycount
-      && value.texture_size === preset.texture_size
-      && value.generate_pbr === preset.generate_pbr;
-  });
+  const presets = system?.generation_presets ?? [];
+  const applyPreset = (name: OptionsState['preset']) => {
+    const preset = presets.find((p) => p.name === name);
+    if (!preset) return;
+    const settings = preset.settings;
+    onChange({
+      ...value,
+      preset: name,
+      adapter: settings.adapter ?? '',
+      target_polycount: String(settings.target_polycount ?? 30000),
+      texture_size: settings.texture_size ?? 1024,
+      generate_pbr: settings.generate_pbr ?? true,
+    });
+  };
 
   return (
     <div className="opt-grid">
@@ -70,16 +70,16 @@ export function OptionsFields({
         <div className="opt-field opt-field--full">
           <span className="opt-field__label">Generation preset</span>
           <div className="gen-presets">
-            {(['fast', 'balanced', 'quality'] as PresetName[]).map((name) => {
-              const required = GENERATION_PRESETS[name].adapter;
-              const disabled = Boolean(required) && !available.has(required);
+            {presets.map((preset) => {
+              const name = preset.name;
+              const disabled = !preset.available;
               return (
                 <button
                   key={name}
                   type="button"
-                  className={`gen-presets__button ${activePreset === name ? 'gen-presets__button--active' : ''}`}
+                  className={`gen-presets__button ${value.preset === name ? 'gen-presets__button--active' : ''}`}
                   disabled={disabled}
-                  title={disabled ? `${required} is not available` : `Use the ${name} workload preset`}
+                  title={disabled ? `${preset.required_adapter} is not available` : `Use the ${name} workload preset`}
                   onClick={() => applyPreset(name)}
                 >
                   {name[0].toUpperCase() + name.slice(1)}
@@ -97,7 +97,7 @@ export function OptionsFields({
         <select
           className="input"
           value={value.adapter}
-          onChange={(e) => patch({ adapter: e.target.value })}
+          onChange={(e) => patch({ preset: '', adapter: e.target.value })}
         >
           <option value="">
             Auto{system ? ` (${system.active[adapterKind]})` : ''}
@@ -120,7 +120,7 @@ export function OptionsFields({
             min={100}
             step={1000}
             value={value.target_polycount}
-            onChange={(e) => patch({ target_polycount: e.target.value })}
+            onChange={(e) => patch({ preset: '', target_polycount: e.target.value })}
           />
         </label>
       )}
@@ -130,7 +130,7 @@ export function OptionsFields({
         <select
           className="input"
           value={value.texture_size}
-          onChange={(e) => patch({ texture_size: Number(e.target.value) })}
+          onChange={(e) => patch({ preset: '', texture_size: Number(e.target.value) })}
         >
           <option value={1024}>1024 px</option>
           <option value={2048}>2048 px</option>
@@ -157,7 +157,7 @@ export function OptionsFields({
           <input
             type="checkbox"
             checked={value.generate_pbr}
-            onChange={(e) => patch({ generate_pbr: e.target.checked })}
+            onChange={(e) => patch({ preset: '', generate_pbr: e.target.checked })}
           />
           <span>Generate PBR maps (normal / roughness / metallic / AO)</span>
         </label>
