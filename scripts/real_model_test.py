@@ -17,7 +17,8 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-sys.path.insert(0, "backend")
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "backend"))
 
 from app.config import get_settings, runtime_versions  # noqa: E402
 
@@ -63,7 +64,7 @@ def monitor() -> None:
 
 
 def _load_corpus() -> dict:
-    return json.loads(Path("benchmarks/corpus.json").read_text(encoding="utf-8"))
+    return json.loads((ROOT / "benchmarks" / "corpus.json").read_text(encoding="utf-8"))
 
 
 def _load_case(case_id: str) -> tuple[int, dict]:
@@ -122,10 +123,14 @@ def main() -> None:
     from app.pipeline.base import GenOptions
     from app.pipeline.runner import run_image_to_3d, run_text_to_3d
 
+    peak["used"] = 0
+    peak["baseline"] = 0
+    stop.clear()
     try:
         peak["baseline"] = _gpu_used()
     except Exception:
         peak["baseline"] = 0
+    peak["used"] = peak["baseline"]
     print(f"VRAM budget: {settings.vram_budget_gb} GB")
     print(f"GPU baseline (other processes): {peak['baseline']} MiB")
 
@@ -195,9 +200,9 @@ def main() -> None:
             "mode": mode,
             "runtime": runtime_versions(),
             "source_revisions": {
-                "assetforge": _git_revision(Path(".")),
-                "triposr": _git_revision(Path("external/TripoSR")),
-                "hunyuan3d_2": _git_revision(Path("external/Hunyuan3D-2")),
+                "assetforge": _git_revision(ROOT),
+                "triposr": _git_revision(ROOT / "external" / "TripoSR"),
+                "hunyuan3d_2": _git_revision(ROOT / "external" / "Hunyuan3D-2"),
             },
             "settings": {
                 "target_polycount": opts.target_polycount,
@@ -221,6 +226,8 @@ def main() -> None:
         out_dir.mkdir(parents=True, exist_ok=True)
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         out = args.output or out_dir / f"real-model-{args.adapter}-{args.case_id}-{stamp}.json"
+        if not out.is_absolute():
+            out = ROOT / out
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps(report, indent=2), encoding="utf-8")
         print(f"\nBenchmark report: {out}")
