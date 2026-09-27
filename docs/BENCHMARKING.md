@@ -54,7 +54,14 @@ Individual model reports include:
 - per-stage timings
 - GPU baseline, total peak, and peak delta
 - structured failure category when available
+- whether the result was degraded, plus its degradation record
 - finished-asset stats and validation result
+
+A **degraded pass** means a usable, structurally validated asset was produced but
+one intended model stage did not complete. For example, Hunyuan Shape can remain
+usable when its isolated Paint worker has an operational OOM/timeout/dependency
+failure; AssetForge records that fallback and uses the reference-projection path.
+These runs are not counted as clean passes when summaries are reviewed for tuning.
 
 Worker-environment runtime versions are captured once per suite instead of once
 per case so the provenance probe does not add repeated setup overhead to the
@@ -63,7 +70,8 @@ backend is running.
 
 The suite continues after an individual model failure so OOMs, dependency
 failures, and malformed outputs are retained as evidence rather than aborting
-the entire matrix.
+the entire matrix. Summaries report clean passes, degraded passes, and failures
+separately.
 
 ## Single-case investigation
 
@@ -98,5 +106,6 @@ compact evidence table that can later be compared deliberately.
 
 Do not describe a preset as validated, change RTX 3060 defaults from measured
 performance, or promote a new quality backend until real reports from the target
-machine exist. Repository-side tests prove contracts and failure handling; they
-are not substitutes for physical CUDA execution.
+machine exist. A degraded pass is evidence of a usable fallback, not evidence
+that the intended full pipeline succeeded. Repository-side tests prove contracts
+and failure handling; they are not substitutes for physical CUDA execution.

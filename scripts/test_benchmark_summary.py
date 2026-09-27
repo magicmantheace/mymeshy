@@ -33,13 +33,14 @@ def _report(status: str, adapter: str, case_id: str, *, degraded: bool = False) 
         "source_revisions": {"assetforge": "deadbeef"},
     }
     if degraded:
-        report["adapter_extras"] = {
-            "paint_fallback": {
-                "worker": "hunyuan_paint",
-                "category": "cuda_oom",
-                "error": "simulated paint OOM",
-            }
+        degradation = {
+            "worker": "hunyuan_paint",
+            "category": "cuda_oom",
+            "error": "simulated paint OOM",
         }
+        report["degraded"] = True
+        report["degradation"] = degradation
+        report["adapter_extras"] = {"paint_fallback": degradation}
     return report
 
 
@@ -58,10 +59,12 @@ def main() -> None:
         (root / "real-model-corrupt.json").write_text("{not json", encoding="utf-8")
 
         summary = summarize_reports(list(root.glob("real-model-*.json")))
+        assert summary["schema_version"] == 2
         assert summary["reports"] == 3
         assert summary["passed"] == 2
+        assert summary["clean_passed"] == 1
+        assert summary["degraded_passed"] == 1
         assert summary["failed"] == 1
-        assert summary["degraded"] == 1
         assert len(summary["malformed_reports"]) == 1
 
         failed = next(row for row in summary["rows"] if row["status"] == "failed")
@@ -87,7 +90,7 @@ def main() -> None:
         assert "image_chair" in csv_text
         assert "cuda_oom" in csv_text
 
-    print("PASS: benchmark summaries distinguish passed, failed, and degraded runs")
+    print("PASS: benchmark summaries separate clean, degraded, and failed runs")
 
 
 if __name__ == "__main__":
