@@ -17,6 +17,11 @@ RAW_ALBEDO_FILE = "source/generated_albedo.png"
 RAW_MAP_DIR = "source/generated_material"
 
 
+def has_generation_checkpoint(asset_path: Path) -> bool:
+    """Return whether an asset has the durable files needed for post-process resume."""
+    return (asset_path / CHECKPOINT_FILE).is_file() and (asset_path / RAW_MESH_FILE).is_file()
+
+
 def _json_safe(value):
     """Convert adapter diagnostics/options to durable JSON without breaking a checkpoint."""
     if value is None or isinstance(value, (str, int, float, bool)):
