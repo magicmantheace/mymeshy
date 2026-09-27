@@ -11,6 +11,7 @@ export interface JobRecord {
   progress: number; // 0..1
   message?: string;
   error?: string;
+  error_category?: string;
   asset_id?: string;
   resumable?: boolean;
   created_at: string;
