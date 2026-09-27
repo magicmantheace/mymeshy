@@ -48,21 +48,32 @@ def main() -> None:
     }
     assert required_tools <= funcs.keys(), required_tools - funcs.keys()
 
+    generation_args = (
+        "preset",
+        "target_polycount",
+        "texture_size",
+        "adapter",
+        "seed",
+        "generate_pbr",
+        "decimate",
+    )
     for name in ("text_to_3d", "image_to_3d"):
         defaults = _defaults(funcs[name])
-        for arg in ("preset", "target_polycount", "texture_size", "adapter", "seed"):
+        for arg in generation_args:
             assert arg in defaults, f"{name} missing {arg}"
-        # Named presets must not be silently overridden by MCP-side defaults.
-        assert _is_none(defaults["preset"])
-        assert _is_none(defaults["target_polycount"])
-        assert _is_none(defaults["texture_size"])
+            # Named presets must not be silently overridden by MCP-side defaults.
+            assert _is_none(defaults[arg]), f"{name}.{arg} must default to None"
 
-    assert '"preset": preset' in source
+    for field in generation_args:
+        assert f'"{field}": {field}' in source, f"_options missing {field}"
     assert '/api/assets/{asset_id}/resume' in source
     assert '/api/jobs/{job_id}/cancel' in source
     assert '/api/assets/{asset_id}' in source
 
-    print("PASS: MCP exposes backend presets, diagnostics, cancellation, asset detail, and checkpoint resume")
+    print(
+        "PASS: MCP exposes backend presets/options, diagnostics, cancellation, "
+        "asset detail, and checkpoint resume"
+    )
 
 
 if __name__ == "__main__":
