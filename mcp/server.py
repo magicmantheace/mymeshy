@@ -64,6 +64,8 @@ def _options(
     adapter: Optional[str],
     seed: Optional[int],
     preset: Optional[str] = None,
+    generate_pbr: Optional[bool] = None,
+    decimate: Optional[bool] = None,
 ) -> dict:
     """Build generation options without overriding a named preset unintentionally."""
     return {
@@ -74,6 +76,8 @@ def _options(
             "texture_size": texture_size,
             "adapter": adapter,
             "seed": seed,
+            "generate_pbr": generate_pbr,
+            "decimate": decimate,
         }.items()
         if v is not None
     }
@@ -96,14 +100,16 @@ def text_to_3d(
     texture_size: Optional[int] = None,
     adapter: Optional[str] = None,
     seed: Optional[int] = None,
+    generate_pbr: Optional[bool] = None,
+    decimate: Optional[bool] = None,
     wait_seconds: float = 600,
 ) -> dict:
     """Generate a textured 3D asset from a text description. `preset` may be
     fast, balanced, or quality; inspect system_status first because availability
-    depends on installed adapters. Explicit target/texture/adapter arguments
-    override fields from the named preset. When no preset or overrides are
-    supplied, backend defaults are used. Returns the terminal job or an
-    in-progress job if wait_seconds expires."""
+    depends on installed adapters. Explicit option arguments override fields
+    from the named preset. When no preset or overrides are supplied, backend
+    defaults are used. Returns the terminal job or an in-progress job if
+    wait_seconds expires."""
     with _client() as c:
         job = _check(
             c.post(
@@ -111,7 +117,13 @@ def text_to_3d(
                 json={
                     "prompt": prompt,
                     "options": _options(
-                        target_polycount, texture_size, adapter, seed, preset
+                        target_polycount,
+                        texture_size,
+                        adapter,
+                        seed,
+                        preset,
+                        generate_pbr,
+                        decimate,
                     ),
                 },
             )
@@ -127,12 +139,14 @@ def image_to_3d(
     texture_size: Optional[int] = None,
     adapter: Optional[str] = None,
     seed: Optional[int] = None,
+    generate_pbr: Optional[bool] = None,
+    decimate: Optional[bool] = None,
     wait_seconds: float = 600,
 ) -> dict:
     """Reconstruct a textured 3D asset from one or more local reference images
     (absolute paths). `preset` may be fast, balanced, or quality; explicit
-    settings override fields from the preset. The first image is the primary
-    view."""
+    option arguments override fields from the preset. The first image is the
+    primary view."""
     files = []
     for p in image_paths:
         path = Path(p)
@@ -148,7 +162,15 @@ def image_to_3d(
                 files=files,
                 data={
                     "options": _json.dumps(
-                        _options(target_polycount, texture_size, adapter, seed, preset)
+                        _options(
+                            target_polycount,
+                            texture_size,
+                            adapter,
+                            seed,
+                            preset,
+                            generate_pbr,
+                            decimate,
+                        )
                     )
                 },
             )
