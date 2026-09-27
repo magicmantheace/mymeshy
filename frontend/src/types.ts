@@ -18,7 +18,14 @@ export interface JobRecord {
   params: Record<string, unknown>;
 }
 
-export type TextureMap = 'albedo' | 'normal' | 'roughness' | 'metallic' | 'ao';
+export type TextureMap =
+  | 'albedo'
+  | 'normal'
+  | 'roughness'
+  | 'metallic'
+  | 'ao'
+  | 'metallic_roughness'
+  | 'occlusion';
 
 export interface AssetMeta {
   id: string;
