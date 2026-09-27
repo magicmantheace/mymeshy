@@ -50,8 +50,26 @@ def validate_finished_asset(mesh: trimesh.Trimesh, asset_path: Path, textures: l
             errors.append(f"invalid texture {name}.png: {exc}")
 
     model = asset_path / "model.glb"
+    exported_geometry = None
     if not model.is_file() or model.stat().st_size < 20:
         errors.append("model.glb was not exported or is empty")
+    else:
+        try:
+            loaded = trimesh.load(model, force="scene")
+            geometries = list(loaded.geometry.values()) if isinstance(loaded, trimesh.Scene) else [loaded]
+            valid = [g for g in geometries if isinstance(g, trimesh.Trimesh) and len(g.faces) > 0]
+            if not valid:
+                errors.append("exported model.glb contains no triangle geometry")
+            elif not all(np.isfinite(np.asarray(g.vertices)).all() for g in valid):
+                errors.append("exported model.glb contains non-finite vertex coordinates")
+            else:
+                exported_geometry = {
+                    "meshes": len(valid),
+                    "vertices": int(sum(len(g.vertices) for g in valid)),
+                    "triangles": int(sum(len(g.faces) for g in valid)),
+                }
+        except Exception as exc:
+            errors.append(f"exported model.glb could not be reloaded: {exc}")
 
     report = {
         "passed": not errors,
@@ -60,6 +78,7 @@ def validate_finished_asset(mesh: trimesh.Trimesh, asset_path: Path, textures: l
         "vertices": int(len(mesh.vertices)),
         "triangles": int(len(mesh.faces)),
         "texture_sizes": texture_sizes,
+        "exported_geometry": exported_geometry,
     }
     if errors:
         raise ValueError("asset validation failed: " + "; ".join(errors))
