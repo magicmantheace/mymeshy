@@ -10,6 +10,7 @@ if (-not (Test-Path $python)) {
 
 $tests = @(
     "scripts\test_hardware_policy.py",
+    "scripts\test_generation_presets.py",
     "scripts\test_worker_framework.py",
     "scripts\test_checkpoint_resume.py",
     "scripts\test_job_asset_link.py",

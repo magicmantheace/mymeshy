@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from . import __version__, export, store
 from .config import detect_blender, detect_gpu, get_settings
 from .jobs import get_job_manager
-from .pipeline import checkpoint, registry, runner
+from .pipeline import checkpoint, presets, registry, runner
 from .pipeline.base import GenOptions, runtime_vram_policy
 from .workers.launch import worker_policy_summary
 
@@ -36,17 +36,25 @@ def _save_upload(up: UploadFile, allowed: set[str]) -> Path:
 
 def _parse_options(options: Optional[str]) -> GenOptions:
     settings = get_settings()
-    base = GenOptions(
-        target_polycount=settings.default_target_polycount,
-        texture_size=settings.default_texture_size,
-    )
-    if not options:
-        return base
     try:
-        d = json.loads(options)
+        d = json.loads(options) if options else {}
     except json.JSONDecodeError:
         raise HTTPException(400, "options must be a JSON object")
-    for k, v in (d or {}).items():
+    if not isinstance(d, dict):
+        raise HTTPException(400, "options must be a JSON object")
+
+    preset_name = d.get("preset")
+    if preset_name:
+        try:
+            base = presets.resolve(str(preset_name))
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+    else:
+        base = GenOptions(
+            target_polycount=settings.default_target_polycount,
+            texture_size=settings.default_texture_size,
+        )
+    for k, v in d.items():
         if k in GenOptions.__dataclass_fields__ and v is not None:
             setattr(base, k, v)
     if base.texture_size not in (256, 512, 1024, 2048, 4096):
@@ -62,14 +70,16 @@ def _parse_options(options: Optional[str]) -> GenOptions:
 @router.get("/system")
 def system_info() -> dict:
     active = registry.active_names()
+    adapter_status = {stage: registry.describe(stage) for stage in
+                      ("image_to_3d", "text_to_image", "texturing")}
     return {
         "version": __version__,
         "gpu": detect_gpu(),
         "memory_policy": runtime_vram_policy(),
         "workers": worker_policy_summary(),
         "blender": detect_blender() is not None,
-        "adapters": {stage: registry.describe(stage) for stage in
-                     ("image_to_3d", "text_to_image", "texturing")},
+        "adapters": adapter_status,
+        "generation_presets": presets.public(adapter_status["image_to_3d"]),
         "active": active,
         "mock_mode": active["image_to_3d"] == "mock",
     }

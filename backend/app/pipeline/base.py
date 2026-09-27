@@ -25,6 +25,7 @@ ProgressFn = Callable[[float, str], None]
 
 @dataclass
 class GenOptions:
+    preset: Optional[str] = None
     adapter: Optional[str] = None
     target_polycount: int = 30000
     texture_size: int = 1024

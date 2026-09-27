@@ -317,6 +317,7 @@ def run_text_to_3d(
         "name": store.slugify(prompt).replace("-", " ") or "asset",
         "source": {"type": "text", "prompt": prompt},
         "adapter": i23d.name,
+        "generation": {"preset": opts.preset, "options": dict(opts.__dict__)},
     }
     checkpoint.save_generation_checkpoint(asset_path, result, opts, meta)
     return postprocess_to_asset(result, opts, reporter, asset_id, asset_path, meta,
@@ -360,6 +361,7 @@ def run_image_to_3d(
         "name": name,
         "source": {"type": "image", "image_names": [p.name for p in image_paths]},
         "adapter": i23d.name,
+        "generation": {"preset": opts.preset, "options": dict(opts.__dict__)},
     }
     checkpoint.save_generation_checkpoint(asset_path, result, opts, meta)
     return postprocess_to_asset(result, opts, reporter, asset_id, asset_path, meta,
