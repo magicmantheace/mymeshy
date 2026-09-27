@@ -1,11 +1,7 @@
 """MyMeshy MCP server.
 
 Exposes the local generation backend as MCP tools so coding agents
-(Claude Code, Cursor, ...) can request game assets while you develop:
-
-    "Generate a low-poly health potion for my dungeon crawler and export it
-     as GLB into ./game/assets/props"
-
+(Claude Code, Cursor, ...) can request game assets while you develop.
 Run the MyMeshy backend first, then register this server (see README).
 Transport: stdio.
 """
@@ -24,11 +20,13 @@ BACKEND = os.environ.get("MYMESHY_URL", "http://127.0.0.1:8420")
 mcp = FastMCP(
     "mymeshy",
     instructions=(
-        "Local AI 3D asset generator. Generation runs on the local GPU and takes "
-        "from seconds (mock/triposr) to several minutes (trellis/hunyuan3d). "
-        "Submit a job, then poll with get_job or block with wait_for_job. "
-        "Finished assets are GLB files with PBR textures; use export_asset to "
-        "copy them into a game project in glb/gltf/obj/fbx format."
+        "Local AI 3D asset generator. Generation runs on the local GPU and may "
+        "take from seconds to several minutes. Use system_status to inspect "
+        "hardware, adapters, workers, and named generation presets. Submit a "
+        "job, then poll with get_job or block with wait_for_job. Failed jobs may "
+        "be resumable from a generation checkpoint; use resume_postprocess when "
+        "the job reports resumable=true. Finished assets can be inspected with "
+        "get_asset and exported with export_asset."
     ),
 )
 
@@ -60,20 +58,36 @@ def _wait(job_id: str, timeout_s: float) -> dict:
             time.sleep(2)
 
 
-def _options(target_polycount: Optional[int], texture_size: Optional[int],
-             adapter: Optional[str], seed: Optional[int]) -> dict:
-    return {k: v for k, v in {
-        "target_polycount": target_polycount,
-        "texture_size": texture_size,
-        "adapter": adapter,
-        "seed": seed,
-    }.items() if v is not None}
+def _options(
+    target_polycount: Optional[int],
+    texture_size: Optional[int],
+    adapter: Optional[str],
+    seed: Optional[int],
+    preset: Optional[str] = None,
+    generate_pbr: Optional[bool] = None,
+    decimate: Optional[bool] = None,
+) -> dict:
+    """Build generation options without overriding a named preset unintentionally."""
+    return {
+        k: v
+        for k, v in {
+            "preset": preset,
+            "target_polycount": target_polycount,
+            "texture_size": texture_size,
+            "adapter": adapter,
+            "seed": seed,
+            "generate_pbr": generate_pbr,
+            "decimate": decimate,
+        }.items()
+        if v is not None
+    }
 
 
 @mcp.tool()
 def system_status() -> dict:
-    """Backend status: GPU, which AI adapters are installed/active, whether FBX
-    export (Blender) is available, and whether the app is in mock mode."""
+    """Backend diagnostics including GPU/memory policy, runtime versions,
+    isolated-worker readiness, adapter availability, and named generation
+    presets. Read this before choosing a preset or explicit adapter."""
     with _client() as c:
         return _check(c.get("/api/system"))
 
@@ -81,35 +95,58 @@ def system_status() -> dict:
 @mcp.tool()
 def text_to_3d(
     prompt: str,
-    target_polycount: int = 30000,
-    texture_size: int = 1024,
+    preset: Optional[str] = None,
+    target_polycount: Optional[int] = None,
+    texture_size: Optional[int] = None,
     adapter: Optional[str] = None,
     seed: Optional[int] = None,
+    generate_pbr: Optional[bool] = None,
+    decimate: Optional[bool] = None,
     wait_seconds: float = 600,
 ) -> dict:
-    """Generate a textured 3D asset from a text description (e.g. "rusty
-    medieval barrel with iron bands, game prop"). Describe one single object.
-    Returns the finished job including asset_id, or the in-progress job if it
-    exceeds wait_seconds. Pass wait_seconds=0 to return immediately."""
+    """Generate a textured 3D asset from a text description. `preset` may be
+    fast, balanced, or quality; inspect system_status first because availability
+    depends on installed adapters. Explicit option arguments override fields
+    from the named preset. When no preset or overrides are supplied, backend
+    defaults are used. Returns the terminal job or an in-progress job if
+    wait_seconds expires."""
     with _client() as c:
-        job = _check(c.post("/api/jobs/text-to-3d", json={
-            "prompt": prompt,
-            "options": _options(target_polycount, texture_size, adapter, seed),
-        }))
+        job = _check(
+            c.post(
+                "/api/jobs/text-to-3d",
+                json={
+                    "prompt": prompt,
+                    "options": _options(
+                        target_polycount,
+                        texture_size,
+                        adapter,
+                        seed,
+                        preset,
+                        generate_pbr,
+                        decimate,
+                    ),
+                },
+            )
+        )
     return _wait(job["id"], wait_seconds) if wait_seconds > 0 else job
 
 
 @mcp.tool()
 def image_to_3d(
     image_paths: list[str],
-    target_polycount: int = 30000,
-    texture_size: int = 1024,
+    preset: Optional[str] = None,
+    target_polycount: Optional[int] = None,
+    texture_size: Optional[int] = None,
     adapter: Optional[str] = None,
     seed: Optional[int] = None,
+    generate_pbr: Optional[bool] = None,
+    decimate: Optional[bool] = None,
     wait_seconds: float = 600,
 ) -> dict:
     """Reconstruct a textured 3D asset from one or more local reference images
-    (absolute paths). The first image is the primary view."""
+    (absolute paths). `preset` may be fast, balanced, or quality; explicit
+    option arguments override fields from the preset. The first image is the
+    primary view."""
     files = []
     for p in image_paths:
         path = Path(p)
@@ -119,11 +156,25 @@ def image_to_3d(
     import json as _json
 
     with _client() as c:
-        job = _check(c.post(
-            "/api/jobs/image-to-3d",
-            files=files,
-            data={"options": _json.dumps(_options(target_polycount, texture_size, adapter, seed))},
-        ))
+        job = _check(
+            c.post(
+                "/api/jobs/image-to-3d",
+                files=files,
+                data={
+                    "options": _json.dumps(
+                        _options(
+                            target_polycount,
+                            texture_size,
+                            adapter,
+                            seed,
+                            preset,
+                            generate_pbr,
+                            decimate,
+                        )
+                    )
+                },
+            )
+        )
     return _wait(job["id"], wait_seconds) if wait_seconds > 0 else job
 
 
@@ -167,7 +218,8 @@ def texture_mesh(
 
 @mcp.tool()
 def get_job(job_id: str) -> dict:
-    """Status of a generation job (status, stage, progress 0-1, asset_id when done)."""
+    """Status of a generation job, including structured error category,
+    asset_id, and whether a failed/cancelled job is resumable."""
     with _client() as c:
         return _check(c.get(f"/api/jobs/{job_id}"))
 
@@ -179,10 +231,35 @@ def wait_for_job(job_id: str, timeout_seconds: float = 600) -> dict:
 
 
 @mcp.tool()
+def cancel_job(job_id: str) -> dict:
+    """Request cancellation of a queued or running generation job."""
+    with _client() as c:
+        return _check(c.post(f"/api/jobs/{job_id}/cancel"))
+
+
+@mcp.tool()
+def resume_postprocess(asset_id: str, wait_seconds: float = 600) -> dict:
+    """Resume CPU/post-processing from a durable generation checkpoint without
+    rerunning the expensive image-to-3D model. Use when a failed job reports
+    resumable=true. Returns the new resume job."""
+    with _client() as c:
+        job = _check(c.post(f"/api/assets/{asset_id}/resume"))
+    return _wait(job["id"], wait_seconds) if wait_seconds > 0 else job
+
+
+@mcp.tool()
 def list_assets() -> list:
-    """All generated assets with stats (vertices, triangles, textures, source prompt)."""
+    """All generated assets with stats and source information."""
     with _client() as c:
         return _check(c.get("/api/assets"))
+
+
+@mcp.tool()
+def get_asset(asset_id: str) -> dict:
+    """Full asset metadata including validation, requested generation settings,
+    resolved pipeline adapters, and adapter/fallback provenance."""
+    with _client() as c:
+        return _check(c.get(f"/api/assets/{asset_id}"))
 
 
 @mcp.tool()
@@ -195,7 +272,11 @@ def export_asset(asset_id: str, output_path: str, format: str = "glb") -> dict:
         if resp.status_code >= 400:
             _check(resp)
         suggested = resp.headers.get("content-disposition", "")
-        name = suggested.split("filename=")[-1].strip('"') if "filename=" in suggested else f"{asset_id}.{format}"
+        name = (
+            suggested.split("filename=")[-1].strip('"')
+            if "filename=" in suggested
+            else f"{asset_id}.{format}"
+        )
 
         out = Path(output_path)
         if out.is_dir():
@@ -207,17 +288,17 @@ def export_asset(asset_id: str, output_path: str, format: str = "glb") -> dict:
 
 @mcp.tool()
 def get_texture_maps(asset_id: str, output_dir: str) -> dict:
-    """Save an asset's PBR texture maps (albedo/normal/roughness/metallic/ao)
-    as PNGs into output_dir. Returns the saved file paths."""
+    """Save an asset's available PBR texture maps as PNGs into output_dir.
+    Returns the saved file paths."""
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     saved = []
     with _client() as c:
         meta = _check(c.get(f"/api/assets/{asset_id}"))
-        for m in meta.get("textures", []):
-            resp = c.get(f"/api/assets/{asset_id}/textures/{m}.png")
+        for map_name in meta.get("textures", []):
+            resp = c.get(f"/api/assets/{asset_id}/textures/{map_name}.png")
             if resp.status_code == 200:
-                p = out_dir / f"{asset_id}_{m}.png"
+                p = out_dir / f"{asset_id}_{map_name}.png"
                 p.write_bytes(resp.content)
                 saved.append(str(p.resolve()))
     return {"saved": saved}
