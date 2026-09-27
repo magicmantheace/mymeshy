@@ -13,13 +13,14 @@ import sys
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
 from app import config  # noqa: E402
-from app.pipeline import base  # noqa: E402
+from app.pipeline import base, registry  # noqa: E402
 
 _ENV_KEYS = (
     "MYMESHY_HARDWARE_PROFILE",
@@ -109,6 +110,26 @@ class HardwarePolicyTests(unittest.TestCase):
             ):
                 self.assertTrue(base.constrained_vram())
                 self.assertFalse(base.should_unload_between_stages())
+
+    def test_rtx3060_auto_pool_excludes_legacy_trellis(self):
+        pool = [
+            SimpleNamespace(name="trellis"),
+            SimpleNamespace(name="hunyuan3d"),
+            SimpleNamespace(name="triposr"),
+            SimpleNamespace(name="mock"),
+        ]
+        with patch.object(registry, "hardware_profile_name", return_value="rtx3060_12gb"):
+            names = [adapter.name for adapter in registry._auto_pool("image_to_3d", pool)]
+        self.assertEqual(names, ["hunyuan3d", "triposr", "mock"])
+        self.assertNotIn("trellis", names)
+
+    def test_rtx3060_explicit_trellis_choice_remains_available(self):
+        trellis = SimpleNamespace(name="trellis")
+        pool = [trellis, SimpleNamespace(name="mock")]
+        with patch.dict(registry._POOLS, {"image_to_3d": pool}):
+            with patch.object(registry, "_probe", return_value=(True, "")):
+                selected = registry.resolve("image_to_3d", requested="trellis")
+        self.assertIs(selected, trellis)
 
 
 if __name__ == "__main__":
