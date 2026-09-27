@@ -60,13 +60,18 @@ def save_generation_checkpoint(
         image.save(path)
         native_maps[name] = rel
 
+    safe_extras = _json_safe(result.extras)
+    if safe_extras:
+        generation = meta.setdefault("generation", {})
+        generation["adapter_extras"] = safe_extras
+
     payload = {
         "version": 1,
         "mesh": RAW_MESH_FILE,
         "albedo": RAW_ALBEDO_FILE if albedo_path else None,
         "textured": bool(result.textured),
         "native_maps": native_maps,
-        "extras": _json_safe(result.extras),
+        "extras": safe_extras,
         "options": _json_safe(opts.__dict__),
         "meta": _json_safe(meta),
     }
