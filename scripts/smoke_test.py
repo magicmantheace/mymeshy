@@ -3,7 +3,7 @@
     python scripts/smoke_test.py
 
 Exercises: system info, text-to-3D, image-to-3D, texturing an existing asset,
-GLB validity, texture endpoints, and every export format (FBX skipped when
+GLB validity, finished-asset validation, generation-checkpoint resume, texture\nendpoints, and every export format (FBX skipped when
 Blender is absent).
 """
 from __future__ import annotations
@@ -77,6 +77,7 @@ def main() -> None:
     print("== asset endpoints ==")
     meta = req("GET", f"/api/assets/{asset_id}")
     assert meta["stats"]["has_uv"], "asset missing UVs"
+    assert meta.get("validation", {}).get("passed") is True, "finished-asset validation missing or failed"
     glb = req("GET", f"/api/assets/{asset_id}/model.glb", raw=True)
     assert glb[:4] == b"glTF", "model.glb is not a valid GLB"
     print(f"  ok   GLB valid ({len(glb):,} bytes), stats={meta['stats']}")
@@ -84,6 +85,17 @@ def main() -> None:
         png = req("GET", f"/api/assets/{asset_id}/textures/{t}.png", raw=True)
         assert png[:8] == b"\x89PNG\r\n\x1a\n", f"{t}.png invalid"
     print(f"  ok   textures: {meta['textures']}")
+
+    print("== checkpoint resume ==")
+    resumed = req("POST", f"/api/assets/{asset_id}/resume")
+    resumed = wait_job(resumed["id"], "resume-postprocess")
+    assert resumed["asset_id"] == asset_id, "resume created or linked the wrong asset"
+    resumed_meta = req("GET", f"/api/assets/{asset_id}")
+    assert resumed_meta.get("resumed_from_checkpoint") is True, "resume provenance flag missing"
+    assert resumed_meta.get("validation", {}).get("passed") is True, "resumed asset validation failed"
+    resumed_glb = req("GET", f"/api/assets/{asset_id}/model.glb", raw=True)
+    assert resumed_glb[:4] == b"glTF", "resumed model.glb is not a valid GLB"
+    print("  ok   checkpoint resumed into a validated GLB")
 
     print("== image-to-3d ==")
     # tiny synthetic image: red circle on transparent bg
