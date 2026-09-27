@@ -94,9 +94,10 @@ def _invoke_worker(
     python_executable = python_executable or resolve_worker_python(name)
     python_path = Path(python_executable)
     if not python_path.is_file():
-        raise RuntimeError(
-            f"{name} worker Python does not exist: {python_executable}. "
-            "Run scripts/setup-workers.ps1 or update the matching .env setting."
+        raise WorkerFailure(
+            name,
+            f"worker Python does not exist: {python_executable}. "
+            "Run scripts/setup-workers.ps1 or update the matching .env setting.",
         )
 
     timeout_s = timeout_s or get_settings().worker_timeout_sec
@@ -118,8 +119,8 @@ def _invoke_worker(
             timeout=timeout_s,
         )
     except subprocess.TimeoutExpired as exc:
-        raise RuntimeError(
-            f"{name} worker exceeded the {timeout_s}s timeout and was terminated"
+        raise WorkerFailure(
+            name, f"worker exceeded the {timeout_s}s timeout and was terminated"
         ) from exc
 
 
