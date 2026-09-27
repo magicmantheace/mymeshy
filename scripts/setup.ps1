@@ -46,5 +46,7 @@ try {
 }
 
 Write-Host ""
-Write-Host "Setup complete. Start the app with: .\scripts\dev.ps1" -ForegroundColor Green
-Write-Host "The app runs in MOCK mode until you install real models (README: 'Installing real models')." -ForegroundColor Yellow
+Write-Host "Base setup complete. Start the app in mock mode with: .\scripts\dev.ps1" -ForegroundColor Green
+Write-Host "For the preferred Windows real-model setup, run:" -ForegroundColor Yellow
+Write-Host "  .\scripts\install-models.ps1"
+Write-Host "Fresh-machine guide: docs\WINDOWS_SETUP.md" -ForegroundColor DarkGray
