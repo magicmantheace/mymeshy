@@ -118,6 +118,7 @@ class Hunyuan3DImageTo3D(ImageTo3DAdapter):
 
         if _isolated_enabled():
             from ...workers.launch import (
+                WorkerFailure,
                 probe_worker,
                 run_hunyuan_paint_worker,
                 run_hunyuan_shape_worker,
@@ -129,20 +130,38 @@ class Hunyuan3DImageTo3D(ImageTo3DAdapter):
                 lambda p, m: progress(p * 0.58, m),
             )
             if low_vram():
+                shape.extras["paint_skipped"] = {
+                    "category": "policy",
+                    "reason": "configured VRAM budget is <=8GB",
+                }
                 progress(1.0, "Shape ready (paint skipped: configured VRAM budget is <=8GB)")
                 return shape
 
             paint_ok, paint_reason = probe_worker("hunyuan_paint")
             if not paint_ok:
+                shape.extras["paint_skipped"] = {
+                    "category": "unavailable",
+                    "reason": paint_reason,
+                }
                 progress(1.0, f"Shape ready (paint worker unavailable: {paint_reason})")
                 return shape
 
-            painted = run_hunyuan_paint_worker(
-                shape.mesh,
-                image,
-                opts,
-                lambda p, m: progress(0.58 + p * 0.42, m),
-            )
+            try:
+                painted = run_hunyuan_paint_worker(
+                    shape.mesh,
+                    image,
+                    opts,
+                    lambda p, m: progress(0.58 + p * 0.42, m),
+                )
+            except WorkerFailure as exc:
+                shape.extras["paint_fallback"] = {
+                    "worker": exc.worker,
+                    "category": exc.category,
+                    "error": str(exc),
+                }
+                progress(1.0, f"Shape ready (paint failed: {exc.category}; using reference projection)")
+                return shape
+
             painted.extras["shape_worker_pid"] = shape.extras.get("worker_pid")
             painted.extras["shape_model"] = shape.extras.get("shape_model")
             return painted
@@ -174,7 +193,11 @@ class Hunyuan3DImageTo3D(ImageTo3DAdapter):
         paint_ok, paint_reason = _paint_available()
         if not paint_ok:
             progress(1.0, f"Shape ready (paint skipped: {paint_reason})")
-            return MeshResult(mesh=mesh, textured=False)
+            return MeshResult(
+                mesh=mesh,
+                textured=False,
+                extras={"paint_skipped": {"category": "unavailable", "reason": paint_reason}},
+            )
 
         if should_unload_between_stages():
             del shape

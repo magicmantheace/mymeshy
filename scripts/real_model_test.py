@@ -186,6 +186,7 @@ def main() -> None:
         monitor_thread.join(timeout=2)
         elapsed = now - t0
         ours = max(0, peak["used"] - peak["baseline"])
+        generation_meta = (meta.get("generation") or {}) if meta else {}
         report = {
             "schema_version": 2,
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -194,6 +195,7 @@ def main() -> None:
             "error_category": error_category,
             "adapter": args.adapter,
             "pipeline_adapters": meta.get("pipeline_adapters") if meta else None,
+            "adapter_extras": generation_meta.get("adapter_extras"),
             "case_id": args.case_id,
             "corpus_version": corpus_version,
             "case_fingerprint": _case_fingerprint(case),

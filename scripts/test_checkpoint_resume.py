@@ -45,8 +45,10 @@ def main() -> None:
         assert loaded_opts.target_polycount == 1234
         assert loaded_opts.texture_size == 512
         assert meta["name"] == "checkpoint test"
+        assert meta["generation"]["adapter_extras"]["path"] == "worker/result.glb"
+        assert meta["generation"]["adapter_extras"]["score"] == 0.5
 
-    print("PASS: generation checkpoint round-trip is valid")
+    print("PASS: generation checkpoint round-trip and adapter provenance are valid")
 
 
 if __name__ == "__main__":
