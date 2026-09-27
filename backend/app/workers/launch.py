@@ -94,9 +94,10 @@ def _invoke_worker(
     python_executable = python_executable or resolve_worker_python(name)
     python_path = Path(python_executable)
     if not python_path.is_file():
-        raise RuntimeError(
-            f"{name} worker Python does not exist: {python_executable}. "
-            "Run scripts/setup-workers.ps1 or update the matching .env setting."
+        raise WorkerFailure(
+            name,
+            f"worker Python does not exist: {python_executable}. "
+            "Run scripts/setup-workers.ps1 or update the matching .env setting.",
         )
 
     timeout_s = timeout_s or get_settings().worker_timeout_sec
@@ -118,8 +119,8 @@ def _invoke_worker(
             timeout=timeout_s,
         )
     except subprocess.TimeoutExpired as exc:
-        raise RuntimeError(
-            f"{name} worker exceeded the {timeout_s}s timeout and was terminated"
+        raise WorkerFailure(
+            name, f"worker exceeded the {timeout_s}s timeout and was terminated"
         ) from exc
 
 
@@ -165,6 +166,32 @@ def _is_cuda_oom(detail: str) -> bool:
     ))
 
 
+def classify_worker_failure(detail: str) -> str:
+    """Stable failure category for UI, provenance, and benchmark reports."""
+    text = detail.lower()
+    if _is_cuda_oom(detail):
+        return "cuda_oom"
+    if "timeout" in text or "timed out" in text or "exceeded the" in text:
+        return "timeout"
+    if "no module named" in text or "modulenotfounderror" in text or "importerror" in text:
+        return "dependency"
+    if "does not exist" in text and "worker python" in text:
+        return "configuration"
+    if "without writing result.json" in text:
+        return "missing_result"
+    if "jsondecodeerror" in text or "expecting value" in text:
+        return "malformed_result"
+    return "worker_error"
+
+
+class WorkerFailure(RuntimeError):
+    def __init__(self, worker: str, detail: str):
+        self.worker = worker
+        self.detail = detail
+        self.category = classify_worker_failure(detail)
+        super().__init__(f"{worker} worker failed [{self.category}]: {detail}")
+
+
 def _read_worker_result(
     name: str,
     proc: subprocess.CompletedProcess[str],
@@ -172,12 +199,15 @@ def _read_worker_result(
 ) -> dict:
     if proc.returncode != 0:
         detail = (proc.stderr or proc.stdout or "no worker output").strip()
-        raise RuntimeError(f"{name} worker failed: {detail[-2000:]}")
+        raise WorkerFailure(name, detail[-2000:])
     if not result_path.is_file():
-        raise RuntimeError(f"{name} worker exited without writing result.json")
-    result = json.loads(result_path.read_text(encoding="utf-8"))
+        raise WorkerFailure(name, "worker exited without writing result.json")
+    try:
+        result = json.loads(result_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise WorkerFailure(name, f"malformed result.json: {exc}") from exc
     if result.get("status") != "ok":
-        raise RuntimeError(f"{name} worker failed: {result.get('error', 'unknown error')}")
+        raise WorkerFailure(name, str(result.get("error", "unknown error")))
     return result
 
 

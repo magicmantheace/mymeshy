@@ -27,6 +27,7 @@ class Job:
     progress: float = 0.0
     message: str = ""
     error: Optional[str] = None
+    error_category: Optional[str] = None
     asset_id: Optional[str] = None
     created_at: str = field(default_factory=lambda: time.strftime("%Y-%m-%dT%H:%M:%S"))
 
@@ -155,6 +156,7 @@ class JobManager:
                     log.error("Job %s failed:\n%s", job.id, traceback.format_exc())
                     job.status = "error"
                     job.error = f"{type(exc).__name__}: {exc}"
+                    job.error_category = getattr(exc, "category", None)
                     job.message = "Failed"
             finally:
                 self._save()
