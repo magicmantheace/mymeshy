@@ -7,6 +7,7 @@ const TYPE_LABEL: Record<JobRecord['type'], string> = {
   text_to_3d: 'Text → 3D',
   image_to_3d: 'Image → 3D',
   texture: 'Texture',
+  resume_postprocess: 'Resume processing',
 };
 
 function jobTitle(job: JobRecord): string {
@@ -18,6 +19,7 @@ function jobTitle(job: JobRecord): string {
 function JobItem({ job }: { job: JobRecord }) {
   const cancelJob = useStore((s) => s.cancelJob);
   const selectAsset = useStore((s) => s.selectAsset);
+  const resumeAsset = useStore((s) => s.resumeAsset);
   const active = job.status === 'queued' || job.status === 'running';
   const pct = Math.round(clamp01(job.progress) * 100);
 
@@ -67,9 +69,23 @@ function JobItem({ job }: { job: JobRecord }) {
       )}
 
       {job.status === 'error' && (
-        <div className="job__error" title={job.error}>
-          {job.error ?? 'Unknown error'}
-        </div>
+        <>
+          <div className="job__error" title={job.error}>
+            {job.error ?? 'Unknown error'}
+          </div>
+          {job.resumable && job.asset_id && job.type !== 'resume_postprocess' && (
+            <button
+              className="job__resume"
+              title="Retry cleanup, materials, and export from the saved generation checkpoint"
+              onClick={(e) => {
+                e.stopPropagation();
+                void resumeAsset(job.asset_id!);
+              }}
+            >
+              Retry post-processing
+            </button>
+          )}
+        </>
       )}
 
       <div className="job__meta">
