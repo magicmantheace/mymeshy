@@ -49,12 +49,12 @@ _POOLS: dict[str, list[Adapter]] = {
 def _auto_pool(stage: str, pool: list[Adapter]) -> list[Adapter]:
     """Return hardware-aware auto ordering without changing explicit choices."""
     if stage == "image_to_3d" and hardware_profile_name() == "rtx3060_12gb":
-        # Legacy TRELLIS commonly wants more than 12GB. Hunyuan mini is the
-        # balanced default; TripoSR is the safe/fast fallback. TRELLIS remains
-        # available when explicitly requested and will later be replaced by a
-        # dedicated TRELLIS.2 low-VRAM worker.
-        rank = {"hunyuan3d": 0, "triposr": 1, "trellis": 2, "mock": 99}
-        return sorted(pool, key=lambda a: rank.get(a.name, 50))
+        # Legacy TRELLIS is retained for explicit experiments, but its current
+        # in-process path is not a validated 12GB backend and must never be
+        # selected implicitly. Auto therefore falls Hunyuan -> TripoSR -> mock.
+        allowed = [a for a in pool if a.name != "trellis"]
+        rank = {"hunyuan3d": 0, "triposr": 1, "mock": 99}
+        return sorted(allowed, key=lambda a: rank.get(a.name, 50))
     return pool
 
 
