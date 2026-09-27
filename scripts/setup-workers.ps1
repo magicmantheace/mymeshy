@@ -11,6 +11,7 @@ $triposrRoot = "$root\.workers\triposr"
 $triposrPy = "$triposrRoot\Scripts\python.exe"
 $hunyuanRoot = "$root\.workers\hunyuan"
 $hunyuanPy = "$hunyuanRoot\Scripts\python.exe"
+$sourceLocksPath = "$root\backend\model-sources.json"
 $env:UV_CACHE_DIR = "$root\data\uv-cache"
 
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
@@ -20,6 +21,13 @@ if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     Write-Host "Git is required to install/update model sources." -ForegroundColor Red
     exit 1
+}
+if (-not (Test-Path $sourceLocksPath)) {
+    throw "Model source lock file not found: $sourceLocksPath"
+}
+$sourceLocks = Get-Content $sourceLocksPath -Raw | ConvertFrom-Json
+if ([int]$sourceLocks.version -ne 1) {
+    throw "Unsupported model source lock version: $($sourceLocks.version)"
 }
 
 function Set-EnvValue([string]$File, [string]$Key, [string]$Value) {
@@ -37,29 +45,53 @@ function Set-EnvValue([string]$File, [string]$Key, [string]$Value) {
     [System.IO.File]::WriteAllLines($File, [string[]]$updated, [System.Text.UTF8Encoding]::new($false))
 }
 
-function Sync-ShallowRepo([string]$Url, [string]$Path, [string]$Name) {
-    if (-not (Test-Path $Path)) {
-        Write-Host ">> Cloning $Name source..." -ForegroundColor Cyan
-        git clone --depth 1 $Url $Path
-        if ($LASTEXITCODE -ne 0) { throw "Failed to clone $Name." }
-    } elseif (Test-Path "$Path\.git") {
-        Write-Host ">> Updating $Name source..." -ForegroundColor Cyan
-        git -C $Path fetch --depth 1 origin
-        if ($LASTEXITCODE -ne 0) { throw "Failed to fetch $Name." }
-        $branch = (git -C $Path symbolic-ref --short refs/remotes/origin/HEAD 2>$null)
-        if ($LASTEXITCODE -eq 0 -and $branch) {
-            $target = $branch.Trim()
-        } else {
-            $target = "FETCH_HEAD"
-        }
-        git -C $Path reset --hard $target
-        if ($LASTEXITCODE -ne 0) { throw "Failed to update $Name." }
-    } else {
-        throw "$Name source path exists but is not a Git checkout: $Path"
+function Sync-LockedRepo(
+    [string]$Url,
+    [string]$Path,
+    [string]$Name,
+    [string]$Revision
+) {
+    if ($Revision -notmatch '^[0-9a-fA-F]{40}$') {
+        throw "$Name source lock is not a full 40-character commit SHA: $Revision"
     }
-    $revision = (git -C $Path rev-parse HEAD).Trim()
-    Write-Host "$Name revision: $revision" -ForegroundColor DarkGray
-    return $revision
+
+    if (-not (Test-Path $Path)) {
+        Write-Host ">> Initializing $Name source checkout..." -ForegroundColor Cyan
+        New-Item -ItemType Directory -Force $Path | Out-Null
+        git -C $Path init | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "Failed to initialize $Name checkout." }
+        git -C $Path remote add origin $Url
+        if ($LASTEXITCODE -ne 0) { throw "Failed to configure $Name origin." }
+    } elseif (-not (Test-Path "$Path\.git")) {
+        throw "$Name source path exists but is not a Git checkout: $Path"
+    } else {
+        git -C $Path remote get-url origin *> $null
+        if ($LASTEXITCODE -eq 0) {
+            git -C $Path remote set-url origin $Url
+        } else {
+            git -C $Path remote add origin $Url
+        }
+        if ($LASTEXITCODE -ne 0) { throw "Failed to configure $Name origin." }
+    }
+
+    Write-Host ">> Syncing $Name to locked revision $Revision..." -ForegroundColor Cyan
+    git -C $Path fetch --depth 1 origin $Revision
+    if ($LASTEXITCODE -ne 0) { throw "Failed to fetch locked $Name revision $Revision." }
+    git -C $Path checkout --detach --force FETCH_HEAD
+    if ($LASTEXITCODE -ne 0) { throw "Failed to checkout locked $Name revision $Revision." }
+
+    $actual = (git -C $Path rev-parse HEAD).Trim()
+    if ($actual -ne $Revision) {
+        throw "$Name source revision mismatch. Expected $Revision, got $actual."
+    }
+    Write-Host "$Name revision: $actual (locked)" -ForegroundColor DarkGray
+    return $actual
+}
+
+$triposrSource = $sourceLocks.sources.triposr
+$hunyuanSource = $sourceLocks.sources.hunyuan3d_2
+if (-not $triposrSource -or -not $hunyuanSource) {
+    throw "model-sources.json must define triposr and hunyuan3d_2 sources."
 }
 
 New-Item -ItemType Directory -Force "$root\.workers" | Out-Null
@@ -73,7 +105,7 @@ uv pip install --python $triposrPy torch torchvision --index-url https://downloa
 uv pip install --python $triposrPy -r "$root\backend\requirements.txt"
 uv pip install --python $triposrPy -r "$root\backend\requirements-ml.txt"
 uv pip install --python $triposrPy omegaconf einops imageio moderngl huggingface-hub
-$triposrRevision = Sync-ShallowRepo "https://github.com/VAST-AI-Research/TripoSR" "$root\external\TripoSR" "TripoSR"
+$triposrRevision = Sync-LockedRepo ([string]$triposrSource.url) "$root\external\TripoSR" "TripoSR" ([string]$triposrSource.revision)
 
 Write-Host ">> Creating Hunyuan worker venv..." -ForegroundColor Cyan
 if (-not (Test-Path $hunyuanPy)) {
@@ -83,7 +115,7 @@ uv pip install --python $hunyuanPy torch torchvision --index-url https://downloa
 uv pip install --python $hunyuanPy -r "$root\backend\requirements.txt"
 uv pip install --python $hunyuanPy -r "$root\backend\requirements-ml.txt"
 uv pip install --python $hunyuanPy ninja pybind11 opencv-python pymeshlab pygltflib imageio moderngl rembg onnxruntime xatlas
-$hunyuanRevision = Sync-ShallowRepo "https://github.com/Tencent-Hunyuan/Hunyuan3D-2" "$root\external\Hunyuan3D-2" "Hunyuan3D-2"
+$hunyuanRevision = Sync-LockedRepo ([string]$hunyuanSource.url) "$root\external\Hunyuan3D-2" "Hunyuan3D-2" ([string]$hunyuanSource.revision)
 
 if ($CompileHunyuanPaint) {
     Write-Host ">> Compiling Hunyuan Paint CUDA extensions..." -ForegroundColor Cyan
@@ -110,6 +142,7 @@ Set-EnvValue $envFile "MYMESHY_HUNYUAN_PAINT_WORKER_PYTHON" ".workers\hunyuan\Sc
 
 Write-Host "Isolated worker environments ready." -ForegroundColor Green
 Write-Host "Worker paths were written to .env without replacing other settings." -ForegroundColor Green
+Write-Host "Sources were installed from backend\model-sources.json locks." -ForegroundColor Green
 Write-Host ""
 Write-Host "Restart the backend and inspect /api/system." -ForegroundColor Cyan
 Write-Host "For a GPU-free process-isolation check run:"
