@@ -93,6 +93,8 @@ export interface WorkerRuntimeInfo {
   cuda_runtime?: string | null;
   cuda_available: boolean;
   source_revision?: string | null;
+  expected_source_revision?: string | null;
+  source_matches_lock: boolean;
   error?: string | null;
 }
 

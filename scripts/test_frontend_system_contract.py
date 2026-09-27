@@ -22,6 +22,8 @@ def main() -> None:
         "runtime_vram_gb: number",
         "hunyuan_shape: WorkerInfo",
         "hunyuan_paint: WorkerInfo",
+        "expected_source_revision?: string | null",
+        "source_matches_lock: boolean",
     ):
         assert field in TYPES, field
 
@@ -35,10 +37,12 @@ def main() -> None:
     assert "system.workers.triposr" in DIAGNOSTICS
     assert "system.workers.hunyuan_shape" in DIAGNOSTICS
     assert "system.workers.hunyuan_paint" in DIAGNOSTICS
+    assert "source_matches_lock" in DIAGNOSTICS
+    assert "expected_source_revision" in DIAGNOSTICS
     assert "system.adapters.image_to_3d" in DIAGNOSTICS
     assert "system.generation_presets" in DIAGNOSTICS
 
-    print("PASS: frontend system diagnostics consume the backend /api/system contract")
+    print("PASS: frontend system diagnostics consume runtime and source-lock state")
 
 
 if __name__ == "__main__":

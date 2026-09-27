@@ -10,6 +10,11 @@ from ..config import REPO_ROOT
 from .launch import _EXTERNAL_REPOS, resolve_worker_python
 
 _WORKERS = ("triposr", "hunyuan_shape", "hunyuan_paint")
+_SOURCE_LOCK_KEY = {
+    "triposr": "triposr",
+    "hunyuan_shape": "hunyuan3d_2",
+    "hunyuan_paint": "hunyuan3d_2",
+}
 
 
 def _git_revision(path: Path | None) -> str | None:
@@ -25,6 +30,23 @@ def _git_revision(path: Path | None) -> str | None:
         return proc.stdout.strip() if proc.returncode == 0 else None
     except (OSError, subprocess.SubprocessError):
         return None
+
+
+@lru_cache(maxsize=1)
+def _source_locks() -> dict[str, str]:
+    """Return expected external source revisions from the committed lock file."""
+    path = REPO_ROOT / "backend" / "model-sources.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if payload.get("version") != 1:
+            return {}
+        return {
+            str(name): str(spec["revision"])
+            for name, spec in (payload.get("sources") or {}).items()
+            if isinstance(spec, dict) and spec.get("revision")
+        }
+    except (OSError, json.JSONDecodeError, TypeError, KeyError):
+        return {}
 
 
 @lru_cache(maxsize=8)
@@ -96,16 +118,23 @@ print(json.dumps(info))
 
 
 def worker_runtime_summary() -> dict[str, dict]:
-    """Return runtime versions without loading any generation model weights."""
+    """Return runtime versions/source locks without loading generation weights."""
     result: dict[str, dict] = {}
+    locks = _source_locks()
     for name in _WORKERS:
         python_executable = resolve_worker_python(name)
         runtime = dict(_python_runtime(python_executable))
         external = _EXTERNAL_REPOS.get(name)
+        actual_revision = _git_revision(external)
+        expected_revision = locks.get(_SOURCE_LOCK_KEY[name])
         runtime.update(
             {
                 "python": python_executable,
-                "source_revision": _git_revision(external),
+                "source_revision": actual_revision,
+                "expected_source_revision": expected_revision,
+                "source_matches_lock": bool(
+                    actual_revision and expected_revision and actual_revision == expected_revision
+                ),
             }
         )
         result[name] = runtime

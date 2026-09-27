@@ -48,8 +48,18 @@ calls `setup-workers.ps1` to create isolated environments for:
 - `.workers\triposr`
 - `.workers\hunyuan`
 
-It also clones/updates the TripoSR and Hunyuan3D-2 source trees, records the
-installed source revisions, and writes the worker Python paths plus
+TripoSR and Hunyuan3D-2 source are installed at the exact revisions committed in
+`backend\model-sources.json`. Rerunning setup keeps those source revisions fixed
+unless that lock file is intentionally changed. The setup verifies the checked
+out SHA, prints it, and runtime diagnostics compare the installed revision with
+the expected lock so accidental source drift is visible before benchmarking.
+
+The locks make setup reproducible; they are **not** evidence that a revision has
+met an RTX 3060 performance target. Any intentional source-lock update should be
+followed by the same real-model validation/benchmark process before tuned
+defaults are changed.
+
+The setup also writes the worker Python paths plus
 `MYMESHY_ISOLATED_WORKERS=true` into `.env` without replacing unrelated values.
 
 Do not manually install TripoSR/Hunyuan requirements into the backend venv on
@@ -77,9 +87,9 @@ Before attempting a real generation:
 .\scripts\test-control-plane.ps1
 ```
 
-The doctor checks the machine/runtime configuration, including NVIDIA visibility
-and isolated-worker Python/Torch/CUDA provenance. The control-plane suite checks
-repository contracts without loading generation models.
+The doctor checks the machine/runtime configuration, including NVIDIA visibility,
+isolated-worker Python/Torch/CUDA provenance, and external source revisions. The
+control-plane suite checks repository contracts without loading generation models.
 
 Neither command is a substitute for a physical real-model run.
 
@@ -96,7 +106,8 @@ irm http://127.0.0.1:8420/api/system | ConvertTo-Json -Depth 8
 ```
 
 Confirm the detected hardware profile, worker configuration/runtime details,
-adapter readiness, and generation-preset availability before the first run.
+source-lock status, adapter readiness, and generation-preset availability before
+the first run.
 
 ## 6. First real-model evidence
 
@@ -122,10 +133,10 @@ assumptions before the baseline evidence exists.
 The setup scripts are intended to be safe to rerun. If readiness checks fail:
 
 1. rerun `setup.ps1` for the base app/frontend,
-2. rerun `install-models.ps1` for base ML + isolated workers,
+2. rerun `install-models.ps1` for base ML + isolated workers at the committed source locks,
 3. rerun `doctor.ps1`,
 4. only then investigate the specific remaining failure reported by the doctor
    or `/api/system`.
 
-Keep the source revision shown by the benchmark reports when comparing results
-across setup changes.
+Keep both the expected lock and actual source revision shown by diagnostics and
+benchmark reports when comparing results across setup changes.

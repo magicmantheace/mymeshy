@@ -52,11 +52,11 @@ foreach ($worker in $workers) {
     $name, $pyRel, $sourceRel = $worker
     $py = Join-Path $root $pyRel
     $source = Join-Path $root $sourceRel
-    Check "$name worker Python" (Test-Path $py) $py ".\scripts\setup-workers.ps1"
-    Check "$name source" (Test-Path (Join-Path $source ".git")) $source ".\scripts\setup-workers.ps1"
+    Check "$name worker Python" (Test-Path $py) $py ".\scripts\install-models.ps1"
+    Check "$name source" (Test-Path (Join-Path $source ".git")) $source ".\scripts\install-models.ps1"
     if (Test-Path $py) {
         $version = (& $py --version 2>&1)
-        Check "$name Python runtime" ($LASTEXITCODE -eq 0) $version ".\scripts\setup-workers.ps1"
+        Check "$name Python runtime" ($LASTEXITCODE -eq 0) $version ".\scripts\install-models.ps1"
     }
 }
 
@@ -69,14 +69,20 @@ if (Test-Path $python) {
             foreach ($name in @("triposr", "hunyuan_shape", "hunyuan_paint")) {
                 $r = $runtimeReport.workers.$name
                 if ($null -ne $r) {
-                    $ok = [bool]$r.python_version -and [bool]$r.torch_version -and [bool]$r.cuda_available
+                    $runtimeOk = [bool]$r.python_version -and [bool]$r.torch_version -and [bool]$r.cuda_available
                     $detail = "Python $($r.python_version); Torch $($r.torch_version); CUDA runtime $($r.cuda_runtime); CUDA available $($r.cuda_available)"
                     if ($r.error) { $detail += "; $($r.error)" }
-                    Check "$name worker runtime" $ok $detail ".\scripts\setup-workers.ps1"
+                    Check "$name worker runtime" $runtimeOk $detail ".\scripts\install-models.ps1"
+
+                    $actual = [string]$r.source_revision
+                    $expected = [string]$r.expected_source_revision
+                    $lockOk = [bool]$r.source_matches_lock
+                    $lockDetail = "actual $(if ($actual) { $actual } else { 'unknown' }); expected $(if ($expected) { $expected } else { 'unknown' })"
+                    Check "$name source lock" $lockOk $lockDetail ".\scripts\install-models.ps1"
                 }
             }
         } else {
-            Warn "Worker runtime provenance" "could not collect worker Python/Torch/CUDA versions"
+            Warn "Worker runtime provenance" "could not collect worker Python/Torch/CUDA/source-lock state"
         }
     } finally {
         Remove-Item $runtimeFile -Force -ErrorAction SilentlyContinue
@@ -100,7 +106,8 @@ try {
         if ($null -ne $w) {
             $state = if ($w.configured) { "configured" } else { "not configured" }
             $runtime = $w.runtime
-            Write-Host "       Worker ${name}: $state; Python $($runtime.python_version); Torch $($runtime.torch_version); CUDA $($runtime.cuda_runtime)"
+            $lock = if ($runtime.source_matches_lock) { "lock ok" } else { "lock mismatch" }
+            Write-Host "       Worker ${name}: $state; Python $($runtime.python_version); Torch $($runtime.torch_version); CUDA $($runtime.cuda_runtime); $lock"
         }
     }
 } catch { Warn "Backend API" "not running; start .\scripts\dev.ps1 to include runtime adapter probes" }

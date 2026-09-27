@@ -19,6 +19,7 @@ function workerState(worker: WorkerInfo): string {
   if (!worker.configured) return 'not configured';
   if (worker.runtime?.error) return 'runtime error';
   if (worker.runtime && !worker.runtime.cuda_available) return 'CUDA unavailable';
+  if (worker.runtime && !worker.runtime.source_matches_lock) return 'source lock mismatch';
   return worker.runtime ? 'runtime ready' : 'configured';
 }
 
@@ -90,17 +91,24 @@ export function SystemDiagnostics({ system, onClose }: { system: SystemInfo; onC
           <span className="panel-subhead__count">{system.workers.enabled ? 'enabled' : 'disabled'}</span>
         </header>
         <div className="meta-rows">
-          {workerEntries.map(([name, worker]) => (
-            <div key={name} className="meta-row" title={worker.runtime?.error || worker.python}>
-              <span className="meta-row__key">{name}</span>
-              <span className="meta-row__val mono">
-                {workerState(worker)}
-                {worker.runtime?.torch_version ? ` · torch ${worker.runtime.torch_version}` : ''}
-                {worker.runtime?.cuda_runtime ? ` · CUDA ${worker.runtime.cuda_runtime}` : ''}
-                {worker.runtime?.source_revision ? ` · ${shortRevision(worker.runtime.source_revision)}` : ''}
-              </span>
-            </div>
-          ))}
+          {workerEntries.map(([name, worker]) => {
+            const runtime = worker.runtime;
+            const lockTitle = runtime
+              ? `actual ${runtime.source_revision || 'unknown'}; expected ${runtime.expected_source_revision || 'unknown'}`
+              : worker.python;
+            return (
+              <div key={name} className="meta-row" title={runtime?.error || lockTitle}>
+                <span className="meta-row__key">{name}</span>
+                <span className="meta-row__val mono">
+                  {workerState(worker)}
+                  {runtime?.torch_version ? ` · torch ${runtime.torch_version}` : ''}
+                  {runtime?.cuda_runtime ? ` · CUDA ${runtime.cuda_runtime}` : ''}
+                  {runtime?.source_revision ? ` · ${shortRevision(runtime.source_revision)}` : ''}
+                  {runtime ? ` · lock ${runtime.source_matches_lock ? 'ok' : 'mismatch'}` : ''}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </section>
 
