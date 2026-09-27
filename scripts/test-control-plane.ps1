@@ -18,7 +18,8 @@ $tests = @(
     "scripts\test_hunyuan_fallback.py",
     "scripts\test_checkpoint_resume.py",
     "scripts\test_job_asset_link.py",
-    "scripts\test_asset_validation.py"
+    "scripts\test_asset_validation.py",
+    "scripts\test_mcp_contract.py"
 )
 
 foreach ($test in $tests) {
