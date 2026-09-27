@@ -60,6 +60,29 @@ foreach ($worker in $workers) {
     }
 }
 
+if (Test-Path $python) {
+    $runtimeFile = Join-Path ([System.IO.Path]::GetTempPath()) ("assetforge-worker-runtime-" + [guid]::NewGuid().ToString("N") + ".json")
+    try {
+        & $python (Join-Path $root "scripts\worker-runtime-info.py") --output $runtimeFile | Out-Null
+        if ($LASTEXITCODE -eq 0 -and (Test-Path $runtimeFile)) {
+            $runtimeReport = Get-Content $runtimeFile -Raw | ConvertFrom-Json
+            foreach ($name in @("triposr", "hunyuan_shape", "hunyuan_paint")) {
+                $r = $runtimeReport.workers.$name
+                if ($null -ne $r) {
+                    $ok = [bool]$r.python_version -and [bool]$r.torch_version -and [bool]$r.cuda_available
+                    $detail = "Python $($r.python_version); Torch $($r.torch_version); CUDA runtime $($r.cuda_runtime); CUDA available $($r.cuda_available)"
+                    if ($r.error) { $detail += "; $($r.error)" }
+                    Check "$name worker runtime" $ok $detail ".\scripts\setup-workers.ps1"
+                }
+            }
+        } else {
+            Warn "Worker runtime provenance" "could not collect worker Python/Torch/CUDA versions"
+        }
+    } finally {
+        Remove-Item $runtimeFile -Force -ErrorAction SilentlyContinue
+    }
+}
+
 $blender = Get-Command blender -ErrorAction SilentlyContinue
 if ($blender) {
     $bv = (& blender --version 2>$null | Select-Object -First 1)
@@ -69,14 +92,15 @@ if ($blender) {
 try {
     $system = Invoke-RestMethod -Uri "http://127.0.0.1:8420/api/system" -TimeoutSec 4
     Check "Backend API" $true "responding on 127.0.0.1:8420"
-    Write-Host "       Profile: $($system.memory_policy.profile); GPU: $($system.gpu.name)"
+    Write-Host "       Profile: $($system.memory_policy.hardware_profile); GPU: $($system.gpu.name)"
     Write-Host "       Python: $($system.runtime.python); Torch: $($system.runtime.torch); CUDA runtime: $($system.runtime.cuda_runtime)"
     Write-Host "       Source revision: $($system.runtime.source_revision)"
     foreach ($name in @("triposr", "hunyuan_shape", "hunyuan_paint")) {
         $w = $system.workers.$name
         if ($null -ne $w) {
             $state = if ($w.configured) { "configured" } else { "not configured" }
-            Write-Host "       Worker ${name}: $state"
+            $runtime = $w.runtime
+            Write-Host "       Worker ${name}: $state; Python $($runtime.python_version); Torch $($runtime.torch_version); CUDA $($runtime.cuda_runtime)"
         }
     }
 } catch { Warn "Backend API" "not running; start .\scripts\dev.ps1 to include runtime adapter probes" }
