@@ -11,6 +11,9 @@ on:
       - ".github/workflows/windows-control-plane.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     name: GPU-free contracts + frontend build
