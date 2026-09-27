@@ -187,9 +187,9 @@ def resume_asset(asset_id: str) -> dict:
     def work(job, progress_cb, cancelled):
         return runner.resume_postprocess(asset_id, progress_cb, cancelled)
 
-    job = get_job_manager().submit(
-        "resume_postprocess", {"asset_id": asset_id}, work
-    )
+    manager = get_job_manager()
+    job = manager.submit("resume_postprocess", {"asset_id": asset_id}, work)
+    manager.link_asset(job.id, asset_id)
     return job.public()
 
 
