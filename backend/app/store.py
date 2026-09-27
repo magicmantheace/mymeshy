@@ -12,7 +12,18 @@ from typing import Optional
 
 from .config import get_settings
 
-TEXTURE_MAPS = ["albedo", "normal", "roughness", "metallic", "ao"]
+# Every texture-map filename the pipeline can publish in asset metadata. This is
+# also the allowlist used by the texture download endpoint, so native adapter
+# maps must live here alongside deterministic fallback maps.
+TEXTURE_MAPS = [
+    "albedo",
+    "normal",
+    "roughness",
+    "metallic",
+    "ao",
+    "metallic_roughness",
+    "occlusion",
+]
 
 
 def _now_iso() -> str:
