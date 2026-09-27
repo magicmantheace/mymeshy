@@ -282,6 +282,25 @@ GPU-free checkpoint contract test with:
 .venv\Scripts\python.exe scripts\test_checkpoint_resume.py
 ```
 
+## Readiness doctor
+
+Before real-model validation or benchmarking on Windows, run:
+
+```powershell
+.\scripts\doctor.ps1
+```
+
+The doctor performs static, non-generation checks for Git, Node 18+, the base
+venv, NVIDIA driver visibility, isolated worker Python environments, TripoSR and
+Hunyuan source checkouts, dotenv presence, and Blender. If the backend is
+already running it also reads `/api/system` for the active hardware profile and
+worker configuration. Failures include the setup command that should repair
+them.
+
+A clean doctor result means the machine is configured for the next validation
+step; it is deliberately **not** treated as evidence that a CUDA model fits,
+generates successfully, or meets a performance target.
+
 ## Verification
 
 After base setup, run all GPU-free control-plane checks with:
