@@ -16,6 +16,7 @@ from .config import detect_blender, detect_gpu, get_settings, runtime_versions
 from .jobs import get_job_manager
 from .pipeline import checkpoint, presets, registry, runner
 from .pipeline.base import GenOptions, runtime_vram_policy
+from .workers.diagnostics import worker_runtime_summary
 from .workers.launch import worker_policy_summary
 
 router = APIRouter(prefix="/api")
@@ -72,12 +73,16 @@ def system_info() -> dict:
     active = registry.active_names()
     adapter_status = {stage: registry.describe(stage) for stage in
                       ("image_to_3d", "text_to_image", "texturing")}
+    workers = worker_policy_summary()
+    for name, runtime in worker_runtime_summary().items():
+        if name in workers:
+            workers[name]["runtime"] = runtime
     return {
         "version": __version__,
         "runtime": runtime_versions(),
         "gpu": detect_gpu(),
         "memory_policy": runtime_vram_policy(),
-        "workers": worker_policy_summary(),
+        "workers": workers,
         "blender": detect_blender() is not None,
         "adapters": adapter_status,
         "generation_presets": presets.public(adapter_status["image_to_3d"]),
