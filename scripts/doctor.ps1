@@ -70,6 +70,8 @@ try {
     $system = Invoke-RestMethod -Uri "http://127.0.0.1:8420/api/system" -TimeoutSec 4
     Check "Backend API" $true "responding on 127.0.0.1:8420"
     Write-Host "       Profile: $($system.memory_policy.profile); GPU: $($system.gpu.name)"
+    Write-Host "       Python: $($system.runtime.python); Torch: $($system.runtime.torch); CUDA runtime: $($system.runtime.cuda_runtime)"
+    Write-Host "       Source revision: $($system.runtime.source_revision)"
     foreach ($name in @("triposr", "hunyuan_shape", "hunyuan_paint")) {
         $w = $system.workers.$name
         if ($null -ne $w) {
