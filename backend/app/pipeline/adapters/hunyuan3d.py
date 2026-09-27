@@ -242,7 +242,7 @@ class HunyuanPaintTexturing(TexturingAdapter):
 
     def probe(self) -> tuple[bool, str]:
         if low_vram():
-            return False, "paint pipeline does not fit the configured <=8GB VRAM budget"
+            return False, "paint pipeline does not fit the configured VRAM budget (needs ~10-12GB)"
         if _isolated_enabled():
             from ...workers.launch import probe_worker
 
