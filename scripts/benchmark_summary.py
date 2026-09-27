@@ -13,6 +13,10 @@ def _row(report: dict, source: Path) -> dict:
     gpu = report.get("gpu") or {}
     settings = report.get("settings") or {}
     pipeline_adapters = report.get("pipeline_adapters") or {}
+    adapter_extras = report.get("adapter_extras") or {}
+    degradation = adapter_extras.get("paint_fallback") or adapter_extras.get("paint_skipped")
+    if not isinstance(degradation, dict):
+        degradation = None
     return {
         "file": source.name,
         "timestamp": report.get("timestamp"),
@@ -22,6 +26,8 @@ def _row(report: dict, source: Path) -> dict:
         "texturing_adapter": pipeline_adapters.get("texturing"),
         "case_id": report.get("case_id"),
         "status": report.get("status"),
+        "degraded": degradation is not None,
+        "degradation_category": degradation.get("category") if degradation else None,
         "error_category": report.get("error_category"),
         "runtime_seconds": report.get("runtime_seconds"),
         "peak_delta_mib": gpu.get("peak_delta_mib"),
@@ -47,11 +53,13 @@ def summarize_reports(paths: list[Path]) -> dict:
 
     passed = sum(row["status"] == "passed" for row in rows)
     failed = sum(row["status"] != "passed" for row in rows)
+    degraded = sum(bool(row["degraded"]) for row in rows)
     return {
         "schema_version": 1,
         "reports": len(rows),
         "passed": passed,
         "failed": failed,
+        "degraded": degraded,
         "malformed_reports": malformed,
         "rows": rows,
     }
@@ -65,9 +73,10 @@ def write_summary(directory: Path) -> tuple[Path, Path]:
 
     fields = [
         "file", "timestamp", "adapter", "text_to_image_adapter", "image_to_3d_adapter",
-        "texturing_adapter", "case_id", "status", "error_category", "runtime_seconds",
-        "peak_delta_mib", "triangles", "texture_size", "target_polycount",
-        "validation_passed", "asset_id", "case_fingerprint", "assetforge_revision",
+        "texturing_adapter", "case_id", "status", "degraded", "degradation_category",
+        "error_category", "runtime_seconds", "peak_delta_mib", "triangles", "texture_size",
+        "target_polycount", "validation_passed", "asset_id", "case_fingerprint",
+        "assetforge_revision",
     ]
     with csv_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
@@ -84,7 +93,10 @@ def main() -> None:
     summary = json.loads(json_path.read_text(encoding="utf-8"))
     print(f"Benchmark summary: {json_path}")
     print(f"CSV summary: {csv_path}")
-    print(f"Reports: {summary['reports']} | passed: {summary['passed']} | failed: {summary['failed']}")
+    print(
+        f"Reports: {summary['reports']} | passed: {summary['passed']} | "
+        f"failed: {summary['failed']} | degraded: {summary['degraded']}"
+    )
     if summary["malformed_reports"]:
         print(f"Malformed reports: {len(summary['malformed_reports'])}")
 
