@@ -86,14 +86,9 @@ instead of silently reused. The script prints the exact source commit installed
 for each model so a benchmark can be tied to the code that produced it.
 
 
-Add to `.env`:
-
-```text
-MYMESHY_ISOLATED_WORKERS=true
-MYMESHY_TRIPOSR_WORKER_PYTHON=.workers\triposr\Scripts\python.exe
-MYMESHY_HUNYUAN_SHAPE_WORKER_PYTHON=.workers\hunyuan\Scripts\python.exe
-MYMESHY_HUNYUAN_PAINT_WORKER_PYTHON=.workers\hunyuan\Scripts\python.exe
-```
+The setup script writes the isolation flag and worker Python paths into `.env`
+automatically. Existing unrelated settings are preserved, and rerunning setup
+updates each worker key in place instead of appending duplicates.
 
 ### Enabling Hunyuan Paint
 
@@ -152,8 +147,8 @@ The most important success criterion is that Shape VRAM is gone before Paint sta
 2. add a TRELLIS.2 quality worker only if upstream/runtime validation supports a practical 12GB configuration
 3. isolate SDXL concept generation only if measurements show it materially improves VRAM recovery
 
-Native adapter albedo + UV layouts are now preserved when available. Full native
-multi-channel PBR preservation remains separate asset-quality work rather than a
-worker-isolation requirement.
+Native adapter albedo + UV layouts and native normal, metallic-roughness, and
+occlusion channels are now preserved when available. Missing material channels
+continue through the deterministic fallback path.
 
 Each future worker should preserve the same file + JSON boundary rather than importing one model environment into another.

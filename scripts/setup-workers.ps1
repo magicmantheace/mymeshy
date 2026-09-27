@@ -22,6 +22,21 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
+function Set-EnvValue([string]$File, [string]$Key, [string]$Value) {
+    $line = "$Key=$Value"
+    $lines = if (Test-Path $File) { @(Get-Content $File) } else { @() }
+    $pattern = "^\s*" + [regex]::Escape($Key) + "\s*="
+    $found = $false
+    $updated = foreach ($existing in $lines) {
+        if ($existing -match $pattern) {
+            if (-not $found) { $line }
+            $found = $true
+        } else { $existing }
+    }
+    if (-not $found) { $updated += $line }
+    [System.IO.File]::WriteAllLines($File, [string[]]$updated, [System.Text.UTF8Encoding]::new($false))
+}
+
 function Sync-ShallowRepo([string]$Url, [string]$Path, [string]$Name) {
     if (-not (Test-Path $Path)) {
         Write-Host ">> Cloning $Name source..." -ForegroundColor Cyan
@@ -87,12 +102,14 @@ if ($CompileHunyuanPaint) {
 }
 
 Write-Host ""
+$envFile = "$root\.env"
+Set-EnvValue $envFile "MYMESHY_ISOLATED_WORKERS" "true"
+Set-EnvValue $envFile "MYMESHY_TRIPOSR_WORKER_PYTHON" ".workers\triposr\Scripts\python.exe"
+Set-EnvValue $envFile "MYMESHY_HUNYUAN_SHAPE_WORKER_PYTHON" ".workers\hunyuan\Scripts\python.exe"
+Set-EnvValue $envFile "MYMESHY_HUNYUAN_PAINT_WORKER_PYTHON" ".workers\hunyuan\Scripts\python.exe"
+
 Write-Host "Isolated worker environments ready." -ForegroundColor Green
-Write-Host "Add these lines to .env:" -ForegroundColor Yellow
-Write-Host "MYMESHY_ISOLATED_WORKERS=true"
-Write-Host "MYMESHY_TRIPOSR_WORKER_PYTHON=.workers\triposr\Scripts\python.exe"
-Write-Host "MYMESHY_HUNYUAN_SHAPE_WORKER_PYTHON=.workers\hunyuan\Scripts\python.exe"
-Write-Host "MYMESHY_HUNYUAN_PAINT_WORKER_PYTHON=.workers\hunyuan\Scripts\python.exe"
+Write-Host "Worker paths were written to .env without replacing other settings." -ForegroundColor Green
 Write-Host ""
 Write-Host "Restart the backend and inspect /api/system." -ForegroundColor Cyan
 Write-Host "For a GPU-free process-isolation check run:"
