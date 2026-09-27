@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "description": "Installation source locks for reproducible worker setup. These revisions are not performance-validation claims; update intentionally and benchmark before changing tuned defaults.",
+  "sources": {
+    "triposr": {
+      "url": "https://github.com/VAST-AI-Research/TripoSR",
+      "revision": "107cefdc244c39106fa830359024f6a2f1c78871"
+    },
+    "hunyuan3d_2": {
+      "url": "https://github.com/Tencent-Hunyuan/Hunyuan3D-2",
+      "revision": "f8db63096c8282cb27354314d896feba5ba6ff8a"
+    }
+  }
+}
