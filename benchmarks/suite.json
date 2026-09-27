@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "description": "Default evidence-gathering matrix for the RTX 3060 validation phase. Settings are deliberately untuned starting points.",
+  "adapters": ["triposr", "hunyuan3d"],
+  "cases": [
+    "image_potion",
+    "image_chair",
+    "image_lamp",
+    "text_crate",
+    "text_stool",
+    "text_lantern"
+  ],
+  "settings": {
+    "target_polycount": 20000,
+    "texture_size": 1024,
+    "seed": 12345
+  }
+}

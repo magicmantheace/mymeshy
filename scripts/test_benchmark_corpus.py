@@ -1,10 +1,12 @@
-"""GPU-free validation of the committed benchmark corpus contract."""
+"""GPU-free validation of the committed benchmark corpus and suite contracts."""
 from __future__ import annotations
+
 import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CORPUS = ROOT / "benchmarks" / "corpus.json"
+SUITE = ROOT / "benchmarks" / "suite.json"
 
 
 def main() -> None:
@@ -22,7 +24,22 @@ def main() -> None:
             assert case.get("generator") in {"potion", "chair", "lamp"}
         else:
             raise AssertionError(f"unsupported mode: {case['mode']}")
-    print(f"PASS: benchmark corpus contains {len(cases)} stable cases")
+
+    suite = json.loads(SUITE.read_text(encoding="utf-8"))
+    assert suite["version"] == 1
+    assert suite["adapters"], "benchmark suite must contain at least one adapter"
+    assert set(suite["adapters"]) <= {"triposr", "hunyuan3d"}
+    assert suite["cases"], "benchmark suite must contain at least one case"
+    assert set(suite["cases"]) <= set(ids), "suite references an unknown corpus case"
+    settings = suite["settings"]
+    assert int(settings["target_polycount"]) > 0
+    assert int(settings["texture_size"]) in {256, 512, 1024, 2048, 4096}
+    assert isinstance(settings["seed"], int)
+
+    print(
+        f"PASS: benchmark corpus has {len(cases)} stable cases; "
+        f"suite defines {len(suite['adapters']) * len(suite['cases'])} runs"
+    )
 
 
 if __name__ == "__main__":
