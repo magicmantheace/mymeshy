@@ -31,7 +31,16 @@ class Job:
     created_at: str = field(default_factory=lambda: time.strftime("%Y-%m-%dT%H:%M:%S"))
 
     def public(self) -> dict:
-        return asdict(self)
+        data = asdict(self)
+        data["resumable"] = False
+        if self.asset_id and self.status in ("error", "cancelled"):
+            try:
+                from .pipeline.checkpoint import has_generation_checkpoint
+                from .store import asset_dir
+                data["resumable"] = has_generation_checkpoint(asset_dir(self.asset_id))
+            except (OSError, ValueError):
+                pass
+        return data
 
 
 class JobManager:
