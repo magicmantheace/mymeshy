@@ -57,6 +57,7 @@ export interface AdapterInfo {
   name: string;
   available: boolean;
   reason?: string;
+  description?: string;
 }
 
 export interface GenerationPreset {
@@ -66,9 +67,58 @@ export interface GenerationPreset {
   settings: GenOptions;
 }
 
+export interface RuntimeInfo {
+  python: string;
+  executable: string;
+  torch?: string | null;
+  cuda_runtime?: string | null;
+  cuda_available: boolean;
+  torch_error?: string;
+  source_revision?: string | null;
+}
+
+export interface MemoryPolicy {
+  hardware_profile: string;
+  runtime_vram_gb: number;
+  hard_cap_gb: number;
+  low_vram: boolean;
+  constrained_vram: boolean;
+  stage_unload: boolean;
+}
+
+export interface WorkerRuntimeInfo {
+  python: string;
+  python_version?: string | null;
+  torch_version?: string | null;
+  cuda_runtime?: string | null;
+  cuda_available: boolean;
+  source_revision?: string | null;
+  error?: string | null;
+}
+
+export interface WorkerInfo {
+  python: string;
+  python_exists: boolean;
+  external_source_exists: boolean;
+  configured: boolean;
+  separate_environment: boolean;
+  runtime?: WorkerRuntimeInfo;
+}
+
+export interface WorkerSystemInfo {
+  enabled: boolean;
+  timeout_sec: number;
+  triposr: WorkerInfo;
+  hunyuan_shape: WorkerInfo;
+  hunyuan_paint: WorkerInfo;
+}
+
 export interface SystemInfo {
   version: string;
+  runtime: RuntimeInfo;
   gpu: { name: string; vram_mb: number } | null;
+  memory_policy: MemoryPolicy;
+  workers: WorkerSystemInfo;
   blender: boolean;
   generation_presets: GenerationPreset[];
   adapters: {
