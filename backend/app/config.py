@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -164,3 +165,31 @@ def detect_gpu() -> Optional[dict]:
         return {"name": name.strip(), "vram_mb": int(float(mem.strip()))}
     except (OSError, ValueError, subprocess.TimeoutExpired):
         return None
+
+
+def runtime_versions() -> dict:
+    """Lightweight runtime/source versions for diagnostics and benchmark provenance."""
+    versions: dict[str, object] = {
+        "python": sys.version.split()[0],
+        "executable": sys.executable,
+    }
+    try:
+        import torch
+        versions["torch"] = getattr(torch, "__version__", None)
+        versions["cuda_runtime"] = getattr(getattr(torch, "version", None), "cuda", None)
+        versions["cuda_available"] = bool(torch.cuda.is_available())
+    except (ImportError, OSError) as exc:
+        versions["torch"] = None
+        versions["cuda_runtime"] = None
+        versions["cuda_available"] = False
+        versions["torch_error"] = str(exc)
+
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=5,
+        )
+        versions["source_revision"] = out.stdout.strip() if out.returncode == 0 else None
+    except (OSError, subprocess.TimeoutExpired):
+        versions["source_revision"] = None
+    return versions
