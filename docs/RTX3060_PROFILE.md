@@ -20,9 +20,9 @@ That profile currently:
 2. Unloads Hunyuan shape before Hunyuan Paint is loaded.
 3. Uses a middle TripoSR renderer chunk size of 4096 instead of the generic 8192 or <=8GB 2048 value.
 4. Uses TripoSR extraction resolution 224 instead of generic 256 or <=8GB 192.
-5. Changes `auto` image-to-3D preference to Hunyuan3D -> TripoSR -> legacy TRELLIS -> mock.
+5. Changes `auto` image-to-3D preference to Hunyuan3D -> TripoSR -> mock. Legacy TRELLIS is excluded from Auto on this profile.
 
-Legacy TRELLIS remains available when explicitly requested. It is intentionally not the automatic first choice for this hardware profile because the current in-process TRELLIS adapter is not designed around 12GB operation. Official TRELLIS.2 is also not promoted on this profile: upstream currently documents Linux-only testing and a 24GB minimum. See `TRELLIS2_RTX3060.md` for the evidence gate.
+Legacy TRELLIS remains available when explicitly requested, but is never selected implicitly by the RTX 3060 Auto path. The current in-process TRELLIS adapter is not a validated 12GB backend. Official TRELLIS.2 is also not promoted on this profile: upstream currently documents Linux-only testing and a 24GB minimum. See `TRELLIS2_RTX3060.md` for the evidence gate.
 
 ## Important distinction: scheduling vs hard cap
 
@@ -53,6 +53,7 @@ Implemented for the RTX 3060 reference profile:
 - user-facing Fast / Balanced / Quality workload presets that stay within the currently supported adapter set
 - failed-job discovery and UI retry for generation checkpoints
 - Windows isolated-worker setup that persists its worker paths into `.env`
+- legacy TRELLIS excluded from RTX 3060 Auto selection while remaining explicitly selectable
 
 Still requires repository work or physical validation:
 
