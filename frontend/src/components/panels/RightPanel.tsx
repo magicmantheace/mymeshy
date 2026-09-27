@@ -12,6 +12,8 @@ const MAP_LABEL: Record<TextureMap, string> = {
   roughness: 'Roughness',
   metallic: 'Metallic',
   ao: 'AO',
+  metallic_roughness: 'Metallic / Roughness',
+  occlusion: 'Occlusion',
 };
 
 const EXPORT_FORMATS: ExportFormat[] = ['glb', 'gltf', 'obj', 'fbx'];
