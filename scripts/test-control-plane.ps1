@@ -22,7 +22,8 @@ $tests = @(
     "scripts\test_asset_validation.py",
     "scripts\test_texture_map_contract.py",
     "scripts\test_frontend_generation_contract.py",
-    "scripts\test_mcp_contract.py"
+    "scripts\test_mcp_contract.py",
+    "scripts\test_windows_install_contract.py"
 )
 
 foreach ($test in $tests) {
