@@ -267,7 +267,9 @@ Tools exposed: `text_to_3d`, `image_to_3d`, `texture_mesh`, `get_job`,
 
 Text-to-3D and image-to-3D jobs save the expensive raw model output before mesh
 cleanup, UV work, PBR generation, and export. If one of those downstream stages
-fails, retry it without running the AI model again:
+fails, retry it without running the AI model again. Failed jobs with a complete
+checkpoint expose **Retry post-processing** directly in the Jobs panel; the API
+equivalent is:
 
 `POST /api/assets/{asset_id}/resume`
 
@@ -302,6 +304,7 @@ Interactive docs at http://127.0.0.1:8420/docs. Highlights:
 
 - `POST /api/jobs/text-to-3d` `{prompt, options}` / `POST /api/jobs/image-to-3d` (multipart) / `POST /api/jobs/texture` (multipart)
 - `GET /api/jobs`, `GET /api/jobs/{id}`, `POST /api/jobs/{id}/cancel`
+- `POST /api/assets/{asset_id}/resume` (checkpointed post-processing retry)
 - `GET /api/assets`, `GET /api/assets/{id}/model.glb`, `GET /api/assets/{id}/textures/{map}.png`
 - `GET /api/assets/{id}/export?format=glb|gltf|obj|fbx`
 
