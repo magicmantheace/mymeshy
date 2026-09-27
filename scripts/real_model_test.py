@@ -193,6 +193,7 @@ def main() -> None:
             "error": error,
             "error_category": error_category,
             "adapter": args.adapter,
+            "pipeline_adapters": meta.get("pipeline_adapters") if meta else None,
             "case_id": args.case_id,
             "corpus_version": corpus_version,
             "case_fingerprint": _case_fingerprint(case),
