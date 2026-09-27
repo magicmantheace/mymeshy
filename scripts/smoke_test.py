@@ -3,7 +3,8 @@
     python scripts/smoke_test.py
 
 Exercises: system info, text-to-3D, image-to-3D, texturing an existing asset,
-GLB validity, finished-asset validation, generation-checkpoint resume, texture\nendpoints, and every export format (FBX skipped when
+GLB validity, finished-asset validation, generation-checkpoint resume, texture
+endpoints, adapter provenance, and every export format (FBX skipped when
 Blender is absent).
 """
 from __future__ import annotations
@@ -78,9 +79,13 @@ def main() -> None:
     meta = req("GET", f"/api/assets/{asset_id}")
     assert meta["stats"]["has_uv"], "asset missing UVs"
     assert meta.get("validation", {}).get("passed") is True, "finished-asset validation missing or failed"
+    pipeline = meta.get("pipeline_adapters", {})
+    assert pipeline.get("text_to_image"), "text-to-3D asset missing text-to-image adapter provenance"
+    assert pipeline.get("image_to_3d") == meta.get("adapter"), "text-to-3D image adapter provenance disagrees"
     glb = req("GET", f"/api/assets/{asset_id}/model.glb", raw=True)
     assert glb[:4] == b"glTF", "model.glb is not a valid GLB"
     print(f"  ok   GLB valid ({len(glb):,} bytes), stats={meta['stats']}")
+    print(f"  ok   adapters: {pipeline}")
     for t in meta["textures"]:
         png = req("GET", f"/api/assets/{asset_id}/textures/{t}.png", raw=True)
         assert png[:8] == b"\x89PNG\r\n\x1a\n", f"{t}.png invalid"
@@ -92,13 +97,13 @@ def main() -> None:
     assert resumed["asset_id"] == asset_id, "resume created or linked the wrong asset"
     resumed_meta = req("GET", f"/api/assets/{asset_id}")
     assert resumed_meta.get("resumed_from_checkpoint") is True, "resume provenance flag missing"
+    assert resumed_meta.get("pipeline_adapters") == pipeline, "resume lost original adapter provenance"
     assert resumed_meta.get("validation", {}).get("passed") is True, "resumed asset validation failed"
     resumed_glb = req("GET", f"/api/assets/{asset_id}/model.glb", raw=True)
     assert resumed_glb[:4] == b"glTF", "resumed model.glb is not a valid GLB"
     print("  ok   checkpoint resumed into a validated GLB")
 
     print("== image-to-3d ==")
-    # tiny synthetic image: red circle on transparent bg
     from PIL import Image, ImageDraw  # available in the backend venv
 
     img = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
@@ -109,7 +114,9 @@ def main() -> None:
         ("images", ("red_ball.png", b.getvalue(), "image/png")),
         ("options", json.dumps({"target_polycount": 4000, "texture_size": 256})),
     ])
-    wait_job(job["id"], "image-to-3d")
+    image_job = wait_job(job["id"], "image-to-3d")
+    image_meta = req("GET", f"/api/assets/{image_job['asset_id']}")
+    assert image_meta.get("pipeline_adapters", {}).get("image_to_3d") == image_meta.get("adapter")
 
     print("== texture existing asset ==")
     job = req("POST", "/api/jobs/texture", multipart=[
@@ -117,7 +124,9 @@ def main() -> None:
         ("prompt", "weathered painted metal"),
         ("options", json.dumps({"texture_size": 256})),
     ])
-    wait_job(job["id"], "texture")
+    texture_job = wait_job(job["id"], "texture")
+    texture_meta = req("GET", f"/api/assets/{texture_job['asset_id']}")
+    assert texture_meta.get("pipeline_adapters", {}).get("texturing") == texture_meta.get("adapter")
 
     print("== exports ==")
     formats = ["glb", "gltf", "obj"] + (["fbx"] if info["blender"] else [])

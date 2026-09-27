@@ -317,6 +317,10 @@ def run_text_to_3d(
         "name": store.slugify(prompt).replace("-", " ") or "asset",
         "source": {"type": "text", "prompt": prompt},
         "adapter": i23d.name,
+        "pipeline_adapters": {
+            "text_to_image": t2i.name,
+            "image_to_3d": i23d.name,
+        },
         "generation": {"preset": opts.preset, "options": dict(opts.__dict__)},
     }
     checkpoint.save_generation_checkpoint(asset_path, result, opts, meta)
@@ -361,6 +365,7 @@ def run_image_to_3d(
         "name": name,
         "source": {"type": "image", "image_names": [p.name for p in image_paths]},
         "adapter": i23d.name,
+        "pipeline_adapters": {"image_to_3d": i23d.name},
         "generation": {"preset": opts.preset, "options": dict(opts.__dict__)},
     }
     checkpoint.save_generation_checkpoint(asset_path, result, opts, meta)
@@ -448,6 +453,8 @@ def run_texture(
         "name": (prompt or source_name)[:48],
         "source": {"type": "texture", "prompt": prompt},
         "adapter": tex.name,
+        "pipeline_adapters": {"texturing": tex.name},
+        "generation": {"preset": opts.preset, "options": dict(opts.__dict__)},
     }
     # The texturing adapter worked with the mesh's existing UVs; keep them.
     keep = hasattr(result.mesh.visual, "uv") and result.mesh.visual.uv is not None

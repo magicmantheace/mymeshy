@@ -12,10 +12,14 @@ def _row(report: dict, source: Path) -> dict:
     validation = report.get("validation") or {}
     gpu = report.get("gpu") or {}
     settings = report.get("settings") or {}
+    pipeline_adapters = report.get("pipeline_adapters") or {}
     return {
         "file": source.name,
         "timestamp": report.get("timestamp"),
         "adapter": report.get("adapter"),
+        "text_to_image_adapter": pipeline_adapters.get("text_to_image"),
+        "image_to_3d_adapter": pipeline_adapters.get("image_to_3d"),
+        "texturing_adapter": pipeline_adapters.get("texturing"),
         "case_id": report.get("case_id"),
         "status": report.get("status"),
         "error_category": report.get("error_category"),
@@ -60,10 +64,10 @@ def write_summary(directory: Path) -> tuple[Path, Path]:
     json_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
     fields = [
-        "file", "timestamp", "adapter", "case_id", "status", "error_category",
-        "runtime_seconds", "peak_delta_mib", "triangles", "texture_size",
-        "target_polycount", "validation_passed", "asset_id", "case_fingerprint",
-        "assetforge_revision",
+        "file", "timestamp", "adapter", "text_to_image_adapter", "image_to_3d_adapter",
+        "texturing_adapter", "case_id", "status", "error_category", "runtime_seconds",
+        "peak_delta_mib", "triangles", "texture_size", "target_polycount",
+        "validation_passed", "asset_id", "case_fingerprint", "assetforge_revision",
     ]
     with csv_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
