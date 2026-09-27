@@ -1477,3 +1477,31 @@ select.input {
 .job__resume:hover {
   background: rgba(255, 255, 255, 0.06);
 }
+
+
+.gen-presets {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 5px;
+}
+
+.gen-presets__button {
+  padding: 7px 6px;
+  border: 1px solid var(--border, #3b4554);
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.gen-presets__button--active {
+  border-color: currentColor;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.gen-presets__button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
