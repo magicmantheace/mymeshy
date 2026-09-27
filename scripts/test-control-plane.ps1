@@ -15,6 +15,7 @@ $tests = @(
     "scripts\test_benchmark_summary.py",
     "scripts\test_worker_framework.py",
     "scripts\test_worker_runtime_diagnostics.py",
+    "scripts\test_hunyuan_fallback.py",
     "scripts\test_checkpoint_resume.py",
     "scripts\test_job_asset_link.py",
     "scripts\test_asset_validation.py"
