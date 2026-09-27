@@ -179,8 +179,10 @@ def classify_worker_failure(detail: str) -> str:
         return "configuration"
     if "without writing result.json" in text:
         return "missing_result"
-    if "jsondecodeerror" in text or "expecting value" in text:
+    if "jsondecodeerror" in text or "expecting value" in text or "invalid triangle mesh" in text:
         return "malformed_result"
+    if "worker mesh is missing" in text:
+        return "missing_result"
     return "worker_error"
 
 
@@ -219,10 +221,15 @@ def _load_mesh_result(
     albedo_path: Path | None = None,
 ) -> MeshResult:
     if not mesh_path.is_file():
-        raise RuntimeError(f"worker mesh is missing: {mesh_path}")
-    loaded = trimesh.load(mesh_path, force="mesh")
+        raise WorkerFailure(str(extras.get("worker", "model")), f"worker mesh is missing: {mesh_path}")
+    try:
+        loaded = trimesh.load(mesh_path, force="mesh")
+    except Exception as exc:
+        raise WorkerFailure(str(extras.get("worker", "model")), f"invalid triangle mesh: {exc}") from exc
     if not isinstance(loaded, trimesh.Trimesh) or len(loaded.faces) == 0:
-        raise RuntimeError("worker produced an invalid triangle mesh")
+        raise WorkerFailure(str(extras.get("worker", "model")), "worker produced an invalid triangle mesh")
+    if not loaded.vertices.shape[0] or not loaded.faces.shape[0]:
+        raise WorkerFailure(str(extras.get("worker", "model")), "worker produced an invalid triangle mesh")
 
     albedo = None
     material = getattr(getattr(loaded, "visual", None), "material", None)
