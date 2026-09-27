@@ -27,6 +27,7 @@ class Job:
     progress: float = 0.0
     message: str = ""
     error: Optional[str] = None
+    error_category: Optional[str] = None
     asset_id: Optional[str] = None
     created_at: str = field(default_factory=lambda: time.strftime("%Y-%m-%dT%H:%M:%S"))
 
