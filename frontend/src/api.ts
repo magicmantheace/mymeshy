@@ -48,15 +48,17 @@ function jsonInit(method: string, body: unknown): RequestInit {
   };
 }
 
-/** Strips undefined / empty values so we only send meaningful options. */
+/** Strips undefined / empty values while preserving explicit backend options. */
 function cleanOptions(options: GenOptions): GenOptions {
   const out: GenOptions = {};
+  if (options.preset) out.preset = options.preset;
   if (options.adapter) out.adapter = options.adapter;
   if (typeof options.target_polycount === 'number' && options.target_polycount > 0)
     out.target_polycount = options.target_polycount;
   if (typeof options.texture_size === 'number') out.texture_size = options.texture_size;
   if (typeof options.generate_pbr === 'boolean') out.generate_pbr = options.generate_pbr;
   if (typeof options.seed === 'number' && Number.isFinite(options.seed)) out.seed = options.seed;
+  if (typeof options.decimate === 'boolean') out.decimate = options.decimate;
   return out;
 }
 
